@@ -1,0 +1,58 @@
+# Nocturnal Documentation
+
+Nocturnal is a CLI tool for spec-driven development and agent tooling. It helps you manage project specifications, rules, and proposals through a structured workflow, while providing tools for AI coding agents to access project context.
+
+## Quick Start
+
+```bash
+# Initialize a specification workspace
+nocturnal spec init
+# Create a new feature proposal
+nocturnal spec proposal add my-feature
+# Activate the proposal to work on it
+nocturnal spec proposal activate my-feature
+# View workspace overview
+nocturnal spec view
+# Complete and promote the proposal
+nocturnal spec proposal complete my-feature
+```
+
+## Core Concepts
+
+### Specifications
+Formal requirements documents that define what a feature must do. Specifications use normative language (MUST, SHOULD, MAY) and include sections for abstract, introduction, requirements, examples, and considerations.
+
+### Proposals
+Development workspaces containing three documents:
+- **specification.md** - The formal requirements
+- **design.md** - Technical design decisions and architecture
+- **implementation.md** - Phased implementation plan with tasks
+
+### Rules
+Project-wide constraints and guidelines that persist across all proposals. Rules define coding standards, architectural patterns, or business constraints.
+
+### Archive
+Completed proposals are archived - their design and implementation documents are preserved for reference, while specifications are promoted to the main section.
+
+## Command Categories
+
+- **[Specification Management](./proposal.md)** - Create and manage proposals through their lifecycle
+- **[Rules Management](./rule.md)** - Define project-wide guidelines and constraints
+- **[MCP Server](./mcp.md)** - Expose tools to AI assistants via Model Context Protocol
+- **Documentation Management** - Store and search API/library documentation
+
+## Shell Completion
+
+Generate shell completion scripts for faster command entry:
+
+```bash
+# Bash
+nocturnal completion bash > /etc/bash_completion.d/nocturnal
+# Zsh
+nocturnal completion zsh > "${fpath[1]}/_nocturnal"
+# Fish
+nocturnal completion fish > ~/.config/fish/completions/nocturnal.fish
+# PowerShell
+nocturnal completion powershell > nocturnal.ps1
+```
+

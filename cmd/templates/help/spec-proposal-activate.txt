@@ -3,5 +3,10 @@ Activate a proposal by setting specification/current symlink.
 Creates or updates the symlink:
     specification/current -> specification/proposal/<change-slug>
 
+Activation will fail if other proposals depend on the target proposal.
+This prevents working on a proposal that serves as a dependency for others.
+Complete the dependent proposals first, or remove the dependency from their
+specification.md files.
+
 Example:
     nocturnal spec proposal activate add-oauth-login

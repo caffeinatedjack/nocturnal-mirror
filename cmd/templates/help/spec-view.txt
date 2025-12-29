@@ -2,11 +2,13 @@ Display an overview of the specification workspace.
 
 Shows:
     - Completed specifications with requirement counts
-    - Active proposal with implementation progress
-    - Other proposals with their progress
+    - Active proposal with implementation progress and dependencies
+    - Other proposals with their progress and dependencies
 
 The progress is calculated from task checkboxes (- [ ] and - [x]) in
 implementation.md files.
+
+Dependencies are read from the "Depends on" field in specification.md files.
 
 Examples:
     nocturnal spec view

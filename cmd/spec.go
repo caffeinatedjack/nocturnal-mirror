@@ -411,6 +411,10 @@ func runSpecView(cmd *cobra.Command, args []string) {
 		} else {
 			fmt.Printf("  %s  %s\n", infoStyle.Render(slug), dimStyle.Render("(no tasks)"))
 		}
+		// Show dependencies for active proposal
+		if deps, _ := getProposalDependencies(proposalPath); len(deps) > 0 {
+			fmt.Printf("  %s %s\n", dimStyle.Render("depends on:"), strings.Join(deps, ", "))
+		}
 	}
 
 	fmt.Println()
@@ -438,9 +442,19 @@ func runSpecView(cmd *cobra.Command, args []string) {
 		for _, name := range otherProposals {
 			propPath := filepath.Join(proposalsPath, name)
 			total, completed := getProposalProgress(propPath)
+			deps, _ := getProposalDependencies(propPath)
+
+			var parts []string
 			if total > 0 {
 				percentage := (completed * 100) / total
-				fmt.Printf("  %s  %s\n", name, dimStyle.Render(fmt.Sprintf("(%d%% complete)", percentage)))
+				parts = append(parts, fmt.Sprintf("%d%% complete", percentage))
+			}
+			if len(deps) > 0 {
+				parts = append(parts, fmt.Sprintf("depends on: %s", strings.Join(deps, ", ")))
+			}
+
+			if len(parts) > 0 {
+				fmt.Printf("  %s  %s\n", name, dimStyle.Render("("+strings.Join(parts, ", ")+")"))
 			} else {
 				fmt.Printf("  %s\n", name)
 			}
@@ -621,6 +635,19 @@ func runSpecProposalActivate(cmd *cobra.Command, args []string) {
 
 	if _, err := os.Stat(proposalPath); os.IsNotExist(err) {
 		printError(fmt.Sprintf("Proposal '%s' does not exist", slug))
+		return
+	}
+
+	// Check if any other proposals depend on this one
+	dependents, err := findDependentProposals(specPath, slug)
+	if err != nil {
+		printError(fmt.Sprintf("Failed to check dependencies: %v", err))
+		return
+	}
+	if len(dependents) > 0 {
+		printError(fmt.Sprintf("Cannot activate '%s': other proposals depend on it", slug))
+		printDim(fmt.Sprintf("Dependent proposals: %s", strings.Join(dependents, ", ")))
+		printDim("Complete the dependent proposals first, or remove the dependency")
 		return
 	}
 

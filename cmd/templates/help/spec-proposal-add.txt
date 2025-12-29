@@ -11,5 +11,10 @@ Creates the following files:
         design.md
         implementation.md
 
+The specification.md includes a "Depends on" field where you can list other
+proposal slugs (comma-separated) that this proposal depends on. Proposals
+that are dependencies cannot be activated until the dependent proposals are
+completed or the dependency is removed.
+
 Example:
     nocturnal spec proposal add add-oauth-login

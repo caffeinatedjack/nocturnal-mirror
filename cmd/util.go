@@ -160,3 +160,87 @@ func nameToSlug(name string) string {
 
 	return strings.TrimSuffix(result.String(), "-")
 }
+
+// getProposalDependencies reads the specification.md file and extracts the "Depends on" field
+func getProposalDependencies(proposalPath string) ([]string, error) {
+	specPath := filepath.Join(proposalPath, "specification.md")
+	content, err := os.ReadFile(specPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to read specification.md: %w", err)
+	}
+
+	return parseDependsOn(string(content)), nil
+}
+
+// parseDependsOn extracts dependencies from the "**Depends on**:" field in content
+func parseDependsOn(content string) []string {
+	lines := strings.Split(content, "\n")
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		// Match "**Depends on**:" or "Depends on:" (case-insensitive)
+		lower := strings.ToLower(trimmed)
+		if strings.HasPrefix(lower, "**depends on**:") || strings.HasPrefix(lower, "depends on:") {
+			// Extract the value after the colon
+			idx := strings.Index(trimmed, ":")
+			if idx == -1 {
+				continue
+			}
+			value := strings.TrimSpace(trimmed[idx+1:])
+			// Remove any trailing comments
+			if commentIdx := strings.Index(value, "<!--"); commentIdx != -1 {
+				value = strings.TrimSpace(value[:commentIdx])
+			}
+			// Skip if empty, "none", or still contains template placeholder
+			if value == "" || strings.ToLower(value) == "none" || strings.Contains(value, "<!--") {
+				return nil
+			}
+			// Parse comma-separated list
+			var deps []string
+			for _, dep := range strings.Split(value, ",") {
+				dep = strings.TrimSpace(dep)
+				if dep != "" {
+					deps = append(deps, dep)
+				}
+			}
+			return deps
+		}
+	}
+	return nil
+}
+
+// findDependentProposals returns a list of proposals that depend on the given slug
+func findDependentProposals(specPath, targetSlug string) ([]string, error) {
+	proposalsPath := filepath.Join(specPath, proposalDir)
+	entries, err := os.ReadDir(proposalsPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to read proposals directory: %w", err)
+	}
+
+	var dependents []string
+	for _, entry := range entries {
+		if !entry.IsDir() || entry.Name() == targetSlug {
+			continue
+		}
+
+		propPath := filepath.Join(proposalsPath, entry.Name())
+		deps, err := getProposalDependencies(propPath)
+		if err != nil {
+			continue // Skip proposals with unreadable specs
+		}
+
+		for _, dep := range deps {
+			if dep == targetSlug {
+				dependents = append(dependents, entry.Name())
+				break
+			}
+		}
+	}
+
+	return dependents, nil
+}

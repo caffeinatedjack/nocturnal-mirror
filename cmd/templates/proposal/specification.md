@@ -1,5 +1,7 @@
 # {{.Name}}
 
+**Depends on**: <!-- comma-separated list of proposal slugs this depends on, or "none" -->
+
 ## Abstract
 
 <!-- 2-4 sentences summarizing what this specification extends/adds/modifies -->
