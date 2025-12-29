@@ -5,7 +5,6 @@ Design documents focus on HOW requirements will be implemented. They complement 
 A design MUST reference its corresponding specification and satisfy its requirements without redefining them.
 
 ## Required Document Structure
-
 ### 1. **Metadata** (Required)
 - Title: "Design: [Feature Name]"
 - Specification Reference
@@ -40,11 +39,6 @@ Structure based on your domain. Include relevant subsections:
 - **API Design**: Endpoints, request/response formats, error handling
 - **Algorithm Design**: Pseudocode, complexity analysis, edge cases
 
-### 7. **Trade-offs** (Required)
-| Trade-off | Gain | Sacrifice | Justification |
-|-----------|------|-----------|---------------|
-| Example   | ...  | ...       | ...           |
-
 ### 8. **Cross-Cutting Concerns** (Required)
 Address as applicable:
 - **Security**: Authentication, authorization, data protection
@@ -77,15 +71,3 @@ graph LR
 - **Focus on HOW**: Don't redefine spec content
 - **Capture uncertainty**: Use Open Questions, not vague statements
 
-## Quality Checklist
-
-- [ ] Specification referenced and requirements addressed
-- [ ] Multiple options considered with clear rationale
-- [ ] Trade-offs explicitly documented
-- [ ] Architecture diagram included
-- [ ] Security, performance, and testing addressed
-- [ ] Migration/rollback plan exists (for changes)
-
----
-
-This format ensures designs are **well-reasoned, justified, and implementable** with clear traceability to specifications.

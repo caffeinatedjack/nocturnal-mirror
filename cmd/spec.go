@@ -55,6 +55,12 @@ var specCmd = &cobra.Command{
 	Short: "Manage project specifications",
 }
 
+var specViewCmd = &cobra.Command{
+	Use:   "view",
+	Short: "View specification workspace overview",
+	Run:   runSpecView,
+}
+
 var specInitCmd = &cobra.Command{
 	Use:   "init",
 	Short: "Initialize a specification workspace",
@@ -146,6 +152,7 @@ var agentSpecificationsCmd = &cobra.Command{
 
 func init() {
 	specCmd.Long = helpText("spec")
+	specViewCmd.Long = helpText("spec-view")
 	specInitCmd.Long = helpText("spec-init")
 	specProposalCmd.Long = helpText("spec-proposal")
 	specProposalAddCmd.Long = helpText("spec-proposal-add")
@@ -162,6 +169,7 @@ func init() {
 
 	rootCmd.AddCommand(specCmd)
 
+	specCmd.AddCommand(specViewCmd)
 	specCmd.AddCommand(specInitCmd)
 	specCmd.AddCommand(specProposalCmd)
 	specCmd.AddCommand(specRuleCmd)
@@ -313,6 +321,150 @@ func completeProposalNames(cmd *cobra.Command, args []string, toComplete string)
 	return proposals, cobra.ShellCompDirectiveNoFileComp
 }
 
+func countRequirements(content string) int {
+	count := 0
+	lines := strings.Split(content, "\n")
+	for _, line := range lines {
+		upper := strings.ToUpper(line)
+		if strings.Contains(upper, "MUST") || strings.Contains(upper, "SHALL") {
+			count++
+		}
+	}
+	return count
+}
+
+func getProposalProgress(proposalPath string) (total int, completed int) {
+	implPath := filepath.Join(proposalPath, "implementation.md")
+	content, err := os.ReadFile(implPath)
+	if err != nil {
+		return 0, 0
+	}
+
+	lines := strings.Split(string(content), "\n")
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "- [ ]") {
+			total++
+		} else if strings.HasPrefix(trimmed, "- [x]") || strings.HasPrefix(trimmed, "- [X]") {
+			total++
+			completed++
+		}
+	}
+	return total, completed
+}
+
+func runSpecView(cmd *cobra.Command, args []string) {
+	specPath, err := checkSpecWorkspace()
+	if err != nil {
+		printError("Specification workspace not initialized")
+		printDim("Run 'nocturnal spec init' first")
+		return
+	}
+
+	fmt.Println()
+
+	// Section 1: Completed Specifications
+	sectionDirPath := filepath.Join(specPath, sectionDir)
+	sectionFiles, err := listMarkdownFiles(sectionDirPath)
+	if err != nil && !os.IsNotExist(err) {
+		printError(fmt.Sprintf("Failed to read section directory: %v", err))
+		return
+	}
+
+	fmt.Println(boldStyle.Render("Specifications"))
+	fmt.Println()
+
+	if len(sectionFiles) == 0 {
+		printDim("  No completed specifications")
+	} else {
+		for _, filename := range sectionFiles {
+			filePath := filepath.Join(sectionDirPath, filename)
+			content, err := os.ReadFile(filePath)
+			if err != nil {
+				continue
+			}
+			name := strings.TrimSuffix(filename, ".md")
+			reqCount := countRequirements(string(content))
+			reqLabel := "requirements"
+			if reqCount == 1 {
+				reqLabel = "requirement"
+			}
+			fmt.Printf("  %s  %s\n", name, dimStyle.Render(fmt.Sprintf("(%d %s)", reqCount, reqLabel)))
+		}
+	}
+
+	fmt.Println()
+
+	// Section 2: Active Proposal
+	fmt.Println(boldStyle.Render("Active Proposal"))
+	fmt.Println()
+
+	slug, proposalPath, err := getActiveProposal(specPath)
+	if err != nil {
+		printWarning(fmt.Sprintf("  %s", err.Error()))
+	} else if slug == "" {
+		printDim("  No active proposal")
+	} else {
+		total, completed := getProposalProgress(proposalPath)
+		if total > 0 {
+			percentage := (completed * 100) / total
+			progressBar := renderProgressBar(completed, total, 20)
+			fmt.Printf("  %s  %s %s\n", infoStyle.Render(slug), progressBar, dimStyle.Render(fmt.Sprintf("%d%% (%d/%d tasks)", percentage, completed, total)))
+		} else {
+			fmt.Printf("  %s  %s\n", infoStyle.Render(slug), dimStyle.Render("(no tasks)"))
+		}
+	}
+
+	fmt.Println()
+
+	// Section 3: Other Proposals
+	fmt.Println(boldStyle.Render("Other Proposals"))
+	fmt.Println()
+
+	proposalsPath := filepath.Join(specPath, proposalDir)
+	entries, err := os.ReadDir(proposalsPath)
+	if err != nil && !os.IsNotExist(err) {
+		printError(fmt.Sprintf("Failed to read proposals directory: %v", err))
+		return
+	}
+
+	otherProposals := []string{}
+	for _, entry := range entries {
+		if entry.IsDir() && entry.Name() != slug {
+			otherProposals = append(otherProposals, entry.Name())
+		}
+	}
+
+	if len(otherProposals) == 0 {
+		printDim("  No other proposals")
+	} else {
+		for _, name := range otherProposals {
+			propPath := filepath.Join(proposalsPath, name)
+			total, completed := getProposalProgress(propPath)
+			if total > 0 {
+				percentage := (completed * 100) / total
+				fmt.Printf("  %s  %s\n", name, dimStyle.Render(fmt.Sprintf("(%d%% complete)", percentage)))
+			} else {
+				fmt.Printf("  %s\n", name)
+			}
+		}
+	}
+
+	fmt.Println()
+}
+
+func renderProgressBar(completed, total, width int) string {
+	if total == 0 {
+		return dimStyle.Render("[" + strings.Repeat("-", width) + "]")
+	}
+
+	filled := (completed * width) / total
+	empty := width - filled
+
+	bar := successStyle.Render(strings.Repeat("█", filled)) + dimStyle.Render(strings.Repeat("░", empty))
+	return "[" + bar + "]"
+}
+
 func runSpecInit(cmd *cobra.Command, args []string) {
 	specPath := getSpecPath()
 
@@ -346,6 +498,7 @@ func runSpecInit(cmd *cobra.Command, args []string) {
 		{"templates/AGENTS.md", "AGENTS.md"},
 		{"templates/specification guidelines.md", "specification guidelines.md"},
 		{"templates/design guidelines.md", "design guidelines.md"},
+		{"templates/coding guidelines.md", "coding guidelines.md"},
 	}
 
 	for _, tf := range templateFiles {
@@ -831,17 +984,19 @@ func validateDesign(content string) ValidationResult {
 		hint string
 	}{
 		{"Context", "Establish the technical landscape and constraints"},
+		{"Goals and Non-Goals", "Define goals and explicitly excluded items"},
+		{"Options Considered", "Document at least 2 viable approaches"},
 		{"Decision", "State the chosen approach and rationale"},
+		{"Detailed Design", "Describe architecture, components, data, or API design"},
+		{"Cross-Cutting Concerns", "Address security, performance, reliability, testing"},
+		{"Implementation Plan", "Define phased approach and milestones"},
 	}
 
 	recommendedSections := []struct {
 		name string
 		hint string
 	}{
-		{"Goals", "Define specific, measurable outcomes"},
-		{"Non-Goals", "Explicitly exclude items outside scope"},
-		{"Option", "Document at least 2 viable approaches"},
-		{"Trade-offs", "Document trade-offs of the decision"},
+		{"Open Questions", "List unresolved items with owners and blocking status"},
 	}
 
 	for _, section := range requiredSections {
@@ -856,10 +1011,27 @@ func validateDesign(content string) ValidationResult {
 		}
 	}
 
+	// Check for metadata
+	hasTitle := containsText(content, "# Design:") || containsText(content, "# design:")
+	if !hasTitle {
+		result.Errors = append(result.Errors, "Missing metadata: Title should be 'Design: [Feature Name]'")
+	}
+
+	hasSpecRef := containsText(content, "Specification Reference") || containsText(content, "specification reference")
+	if !hasSpecRef {
+		result.Warnings = append(result.Warnings, "Missing metadata: Specification Reference")
+	}
+
+	hasStatus := containsText(content, "Status:") || containsText(content, "status:")
+	if !hasStatus {
+		result.Warnings = append(result.Warnings, "Missing metadata: Status (Draft | Review | Approved | Superseded)")
+	}
+
+	// Check for multiple options in Options Considered section
 	hasOption1 := hasSectionPrefix(content, "Option 1") || hasSectionPrefix(content, "Option A")
 	hasOption2 := hasSectionPrefix(content, "Option 2") || hasSectionPrefix(content, "Option B")
 	if hasOption1 && !hasOption2 {
-		result.Warnings = append(result.Warnings, "Only one option documented - guidelines recommend at least 2 alternatives")
+		result.Warnings = append(result.Warnings, "Only one option documented - guidelines require at least 2 alternatives or justification")
 	}
 
 	if containsText(content, "<!-- ") && containsText(content, " -->") {

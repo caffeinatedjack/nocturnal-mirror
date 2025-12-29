@@ -1,0 +1,12 @@
+Display an overview of the specification workspace.
+
+Shows:
+    - Completed specifications with requirement counts
+    - Active proposal with implementation progress
+    - Other proposals with their progress
+
+The progress is calculated from task checkboxes (- [ ] and - [x]) in
+implementation.md files.
+
+Examples:
+    nocturnal spec view

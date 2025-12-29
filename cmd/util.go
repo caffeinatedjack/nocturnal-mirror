@@ -47,7 +47,7 @@ func cwdPath(elem ...string) string {
 }
 
 const (
-	specDir        = "specification"
+	specDir        = "spec"
 	ruleDir        = "rule"
 	proposalDir    = "proposal"
 	archiveDir     = "archive"
@@ -127,38 +127,6 @@ func clearActiveProposalIfMatches(specPath, slug string) {
 	if getActiveProposalSlug(specPath) == slug {
 		os.Remove(filepath.Join(specPath, currentSymlink))
 	}
-}
-
-const todoFileName = "TODO.md"
-
-func getTodoPath() string {
-	return cwdPath(todoFileName)
-}
-
-func readTodoFile() (string, error) {
-	todoPath := getTodoPath()
-	content, err := os.ReadFile(todoPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return "", fmt.Errorf("TODO.md not found in current directory")
-		}
-		return "", fmt.Errorf("failed to read TODO.md: %w", err)
-	}
-	return string(content), nil
-}
-
-func writeTodoFile(todoList TodoList) (string, int, error) {
-	if len(todoList.Todos) == 0 {
-		return "", 0, nil
-	}
-
-	todoPath := getTodoPath()
-	content := generateTodoContent(todoList.Todos)
-	if err := os.WriteFile(todoPath, []byte(content), 0644); err != nil {
-		return "", 0, fmt.Errorf("failed to write TODO.md: %w", err)
-	}
-
-	return todoPath, len(todoList.Todos), nil
 }
 
 func getContentPreview(content string) string {

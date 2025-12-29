@@ -8,35 +8,35 @@ LDFLAGS=-ldflags "-X main.Version=$(VERSION) -X main.BuildTime=$(BUILD_TIME)"
 
 ## build: Build the binary
 build:
-	go build $(LDFLAGS) -o $(BINARY_NAME) .
+	@go build $(LDFLAGS) -o $(BINARY_NAME) .
 
 ## test: Run tests
 test:
-	go test -v -race ./...
+	@go test -v -race ./...
 
 ## install: Install to ~/.local/bin
 install:
-	go build $(LDFLAGS) -o $(BINARY_NAME) .
-	cp $(BINARY_NAME) ~/.local/bin/
-	rm $(BINARY_NAME)
+	@go build $(LDFLAGS) -o $(BINARY_NAME) .
+	@cp $(BINARY_NAME) ~/.local/bin/
+	@rm $(BINARY_NAME)
 
 ## clean: Remove build artifacts
 clean:
-	rm -f $(BINARY_NAME)
-	go clean
+	@rm -f $(BINARY_NAME)
+	@go clean
 
 ## fmt: Format code
 fmt:
-	go fmt ./...
+	@go fmt ./...
 
 ## lint: Run linter
 lint:
-	go vet ./...
+	@go vet ./...
 
 ## deps: Download dependencies
 deps:
-	go mod download
-	go mod tidy
+	@go mod download
+	@go mod tidy
 
 ## help: Show this help
 help:

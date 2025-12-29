@@ -5,7 +5,7 @@
 |_|  |_| \_|__|_/ |_|____   |_|   \_|__|_| |_|  \_\ |_|  |_| |_|  |_| |_|__|_|
 ```
 
-A CLI tool for agent-assisted coding with spec-driven development and documentation management.
+A CLI tool for spec-driven development and agent tooling.
 
 ## Features
 
@@ -18,11 +18,13 @@ Create and manage structured specifications for your project. Initialize a works
 - **Promotion** - Complete proposals to archive designs and promote specs to the main section
 
 ```bash
-nocturnal spec init                      # Initialize workspace
-nocturnal spec proposal add my-feature   # Create a new proposal
-nocturnal spec proposal activate my-feature
-nocturnal spec proposal validate my-feature
-nocturnal spec proposal complete my-feature
+nocturnal spec init                         # Initialize workspace
+nocturnal spec view                         # View workspace overview
+nocturnal spec proposal add my-feature      # Create a new proposal
+nocturnal spec proposal activate my-feature # Set as active proposal
+nocturnal spec proposal validate my-feature # Validate against guidelines
+nocturnal spec proposal complete my-feature # Archive and promote to specs
+nocturnal spec proposal remove my-feature   # Remove a proposal
 ```
 
 ### Project Rules
@@ -42,8 +44,8 @@ Commands designed for AI coding agents to access project context:
 nocturnal agent current   # Get the active proposal with all documents
 nocturnal agent project   # Get project rules and design context
 nocturnal agent specs     # Get completed specifications
-nocturnal agent todoread  # Read TODO.md
-nocturnal agent todowrite # Write structured tasks to TODO.md
+nocturnal agent docs list           # List available documentation
+nocturnal agent docs search <query> # Search documentation by name
 ```
 
 ### MCP Server
@@ -55,33 +57,39 @@ nocturnal mcp
 ```
 
 Available tools:
-- `todoread` / `todowrite` - Task management
-- `current` - Active proposal access
-- `docs_list` / `docs_search` - Documentation lookup 
+- `rules` - Get project rules and design context
+- `current` - Show active proposal (specification and design only)
+- `tasks` - Get implementation tasks for active proposal
+- `docs_list` / `docs_search` - Documentation lookup
 
 ### Documentation Management
 
-Store and search API/library documentation for agent reference:
+Store and search API/library documentation for agent reference. The documentation manager expects documentation to be inside `~/.docs/` folder. Each library should have its own markdown file and inside this file each component should be separated with `---`. This allows the lookup tool to search and get whole components and send it back to the agent.
 
-```bash
-nocturnal agent docs list
-nocturnal agent docs search <query>
-```
-
-The documentation manager expects documentation to be inside `~/.docs/` folder. Each library should have its own markdown file and inside this file each component should be seperated with `---`. This allows the lookup tool to search and get whole components and send it back to the agent. 
-
-I recomend generating these docs with AI using a prompt like this: 
-```
-You’ll write a condensed version of the documentation to ~/.docs. If there are any key references missing, fetch them from the web as well. The goal is to develop a solid understanding of the library. These docs are intended to provide an AI agent with a clear overview of the library or technology, including its usage and where to find additional information. Be as concise as possible to avoid overwhelming the AI's context.
-Separate each logical section with \n---\n, and immediately after the separator, include a header marked with #. Whenever possible, include direct links to the relevant documentation alongside any components or classes.
-```
-Make sure you include individual links to every component for good reliability. This tool is really useful if you are working with a later version then what the AI is trained on. 
+The MCP server exposes a prompt for you to use to generate these reference files.
 
 ## Installation
 
 ```bash
 make build
-make install  # Installs to ~/.local/bin
+make install
+```
+Alternatively you can download the executable from the artifacts.
+
+### Installing MCP server in OpenCode
+
+Add MCP to opencode
+```json
+{
+    "$schema": "https://opencode.ai/config.json",
+    "mcp" : {
+        "nocturnal": {
+            "type": "local",
+            "enabled": true,
+            "command": ["nocturnal", "mcp"]
+        },
+    }
+}
 ```
 
 ## License

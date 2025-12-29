@@ -1,6 +1,7 @@
 Manage project specifications using a procedural, proposal-driven workflow.
 
 Commands:
+    view                View specification workspace overview
     init                Initialize a specification workspace
     proposal add        Create a new proposal
     proposal remove     Remove a proposal
@@ -11,6 +12,7 @@ Commands:
     rule show           Show all rules
 
 Examples:
+    nocturnal spec view
     nocturnal spec init
     nocturnal spec proposal add add-oauth-login
     nocturnal spec proposal activate add-oauth-login

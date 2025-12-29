@@ -1,6 +1,0 @@
-Read and display TODO.md from the current directory.
-
-This command reads and displays the TODO.md file in the current working directory.
-
-Examples:
-    nocturnal agent todoread

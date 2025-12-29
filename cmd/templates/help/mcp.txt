@@ -4,9 +4,9 @@ This allows AI assistants and other MCP clients to interact with nocturnal's
 agent functionality programmatically.
 
 Exposed tools:
-    todowrite       Write tasks to TODO.md
-    todoread        Read TODO.md from the current directory
-    current         Show the currently active proposal
+    rules           Get project rules and design context
+    current         Show active proposal (specification and design only)
+    tasks           Get implementation tasks for active proposal
     docs_list       List available library and API documentation
     docs_search     Search library and API documentation by name
 
