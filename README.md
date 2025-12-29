@@ -29,7 +29,7 @@ Create and manage structured specifications for your project. Initialize a works
                                      │   (promoted)   │
                                      └────────────────┘
 ```
-Read the [docs](/docs/) for the cli commands.
+Read the [docs](/docs/index.md) for the cli commands.
 
 ## Installation
 

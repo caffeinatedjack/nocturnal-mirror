@@ -39,7 +39,7 @@ Completed proposals are archived - their design and implementation documents are
 - **[Specification Management](./proposal.md)** - Create and manage proposals through their lifecycle
 - **[Rules Management](./rule.md)** - Define project-wide guidelines and constraints
 - **[MCP Server](./mcp.md)** - Expose tools to AI assistants via Model Context Protocol
-- **Documentation Management** - Store and search API/library documentation
+- **[Documentation Management](./docs.md)** - Store and search API/library documentation
 
 ## Shell Completion
 
