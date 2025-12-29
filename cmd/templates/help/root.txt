@@ -1,0 +1,9 @@
+Nocturnal - Agent and specification utilities.
+
+Commands:
+    agent   Agent commands (TODO.md, proposals, project, specs, docs)
+    spec    Manage project specifications
+
+Examples:
+    nocturnal spec init
+    nocturnal spec proposal add my-feature

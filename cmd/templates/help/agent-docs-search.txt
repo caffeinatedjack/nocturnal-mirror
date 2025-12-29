@@ -1,0 +1,8 @@
+Search documentation by component name.
+
+Searches for components whose names contain the query string and displays
+the full content of matching components.
+
+Example:
+    nocturnal docs search "component"
+    nocturnal docs search "api"

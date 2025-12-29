@@ -18,6 +18,7 @@ test:
 install:
 	go build $(LDFLAGS) -o $(BINARY_NAME) .
 	cp $(BINARY_NAME) ~/.local/bin/
+	rm $(BINARY_NAME)
 
 ## clean: Remove build artifacts
 clean:

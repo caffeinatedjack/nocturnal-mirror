@@ -1,0 +1,9 @@
+Remove a proposal from specification/proposal/<change-slug>/.
+
+Safety checks:
+    - Refuses if the proposal is currently active (unless --force is used)
+    - Refuses if the proposal does not exist
+
+Example:
+    nocturnal spec proposal remove add-oauth-login
+    nocturnal spec proposal remove --force add-oauth-login

@@ -1,0 +1,15 @@
+Create a new proposal at specification/proposal/<change-slug>/.
+
+The change-slug should be:
+    - lowercase
+    - words separated by hyphens
+    - contains only [a-z0-9-]
+
+Creates the following files:
+    specification/proposal/<change-slug>/
+        specification.md
+        design.md
+        implementation.md
+
+Example:
+    nocturnal spec proposal add add-oauth-login

@@ -1,0 +1,6 @@
+List all documentation components.
+
+Shows the name and a preview of each documentation component.
+
+Example:
+    nocturnal docs list

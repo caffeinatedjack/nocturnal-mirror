@@ -1,0 +1,8 @@
+Show the project rules and design document.
+
+Outputs:
+    - All rules from specification/rule/
+    - Project design from specification/project.md
+
+Example:
+    nocturnal agent project

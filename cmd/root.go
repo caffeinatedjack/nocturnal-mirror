@@ -1,4 +1,3 @@
-// Package cmd implements the CLI commands for nocturnal.
 package cmd
 
 import (
@@ -9,33 +8,47 @@ import (
 )
 
 var (
-	// Version is set at build time via ldflags
 	Version   = "dev"
 	BuildTime = "unknown"
 )
 
 var rootCmd = &cobra.Command{
 	Use:   "nocturnal",
-	Short: "Agent and docs utilities",
-	Long: `Nocturnal - Agent and docs utilities.
+	Short: "Agent and specification utilities",
+}
 
-Commands:
-    agent   Read/write TODO.md in the current directory
-    docs    Search/list components in ~/.docs
-
-Examples:
-    nocturnal agent todowrite < todos.json
-    nocturnal agent todoread
-    nocturnal docs list
-    nocturnal docs search "component"`,
+var completionCmd = &cobra.Command{
+	Use:                   "completion [bash|zsh|fish|powershell]",
+	Short:                 "Generate shell completion script",
+	DisableFlagsInUseLine: true,
+	ValidArgs:             []string{"bash", "zsh", "fish", "powershell"},
+	Args:                  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		switch args[0] {
+		case "bash":
+			rootCmd.GenBashCompletion(os.Stdout)
+		case "zsh":
+			rootCmd.GenZshCompletion(os.Stdout)
+		case "fish":
+			rootCmd.GenFishCompletion(os.Stdout, true)
+		case "powershell":
+			rootCmd.GenPowerShellCompletionWithDesc(os.Stdout)
+		}
+	},
 }
 
 func init() {
 	rootCmd.Version = fmt.Sprintf("%s (built %s)", Version, BuildTime)
+	rootCmd.AddCommand(completionCmd)
 }
 
-// Execute runs the root command.
+func initHelp() {
+	rootCmd.Long = helpText("root")
+	completionCmd.Long = helpText("completion")
+}
+
 func Execute() {
+	initHelp()
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}

@@ -1,0 +1,7 @@
+Activate a proposal by setting specification/current symlink.
+
+Creates or updates the symlink:
+    specification/current -> specification/proposal/<change-slug>
+
+Example:
+    nocturnal spec proposal activate add-oauth-login

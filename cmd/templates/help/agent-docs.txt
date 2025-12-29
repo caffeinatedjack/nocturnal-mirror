@@ -1,0 +1,19 @@
+Manage documentation stored in the ~/.docs directory.
+
+The ~/.docs directory can contain multiple documentation files. Each file
+contains documentation components separated by '---' with headers starting
+with '# component'.
+
+Example file format:
+    ---
+    # my-component
+    This is the content for my component.
+    It can span multiple lines.
+
+    ---
+    # another-component
+    More content here.
+
+Commands:
+    list      List all documentation components from all files
+    search    Search documentation by component name

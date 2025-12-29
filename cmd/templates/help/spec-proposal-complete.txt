@@ -1,0 +1,10 @@
+Complete a proposal by archiving and promoting its specification.
+
+Actions performed:
+    1. Archive design.md and implementation.md to specification/archive/<change-slug>/
+    2. Promote specification.md to specification/section/<change-slug>.md
+    3. Remove the proposal workspace
+    4. Clear the active marker if this proposal was active
+
+Example:
+    nocturnal spec proposal complete add-oauth-login

@@ -1,0 +1,10 @@
+Add a new rule at specification/rule/<rule-name>.md.
+
+Creates a rule template with:
+    - Rule
+    - Rationale
+    - Scope
+    - Exception
+
+Example:
+    nocturnal spec rule add no-external-deps

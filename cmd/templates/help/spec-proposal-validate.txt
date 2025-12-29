@@ -1,0 +1,10 @@
+Validate that a proposal's specification, design, and implementation
+documents follow the project guidelines.
+
+Checks include:
+    - Specification: Required sections (Abstract, Introduction, etc.)
+    - Design: Required sections (Context, Goals, Options, Decision, etc.)
+    - Implementation: Basic structure (Phases, Tasks)
+
+Example:
+    nocturnal spec proposal validate add-oauth-login

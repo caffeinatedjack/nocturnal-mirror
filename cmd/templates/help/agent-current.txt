@@ -1,0 +1,6 @@
+Show the currently active proposal.
+
+Reads the specification/current symlink and displays the active proposal slug.
+
+Example:
+    nocturnal agent current

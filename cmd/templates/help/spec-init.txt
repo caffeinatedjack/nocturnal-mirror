@@ -1,0 +1,15 @@
+Initialize a specification workspace in the current directory.
+
+Creates the following structure:
+    specification/
+        AGENTS.md
+        project.md
+        specification guidelines.md
+        design guidelines.md
+        rule/
+        proposal/
+        archive/
+        section/
+
+Example:
+    nocturnal spec init

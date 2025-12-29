@@ -1,0 +1,6 @@
+Show all rules from specification/rule/.
+
+Rules are displayed in alphabetical order by filename.
+
+Example:
+    nocturnal spec rule show

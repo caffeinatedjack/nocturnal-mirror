@@ -1,0 +1,19 @@
+Manage project specifications using a procedural, proposal-driven workflow.
+
+Commands:
+    init                Initialize a specification workspace
+    proposal add        Create a new proposal
+    proposal remove     Remove a proposal
+    proposal activate   Activate a proposal
+    proposal complete   Complete and promote a proposal
+    proposal validate   Validate proposal against guidelines
+    rule add            Add a new rule
+    rule show           Show all rules
+
+Examples:
+    nocturnal spec init
+    nocturnal spec proposal add add-oauth-login
+    nocturnal spec proposal activate add-oauth-login
+    nocturnal spec proposal validate add-oauth-login
+    nocturnal spec proposal complete add-oauth-login
+    nocturnal spec rule add no-external-deps
