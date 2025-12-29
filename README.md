@@ -72,7 +72,8 @@ The documentation manager expects documentation to be inside `~/.docs/` folder. 
 
 I recomend generating these docs with AI using a prompt like this: 
 ```
-You will write a condensed form of the doc to ~/.docs If there is any important references that need adding, webfetch those as well. Aim to have a conprehensive understanding of the library. The purpose of these docs is to give a AI agent a overview of a particular library or technology, its usage and where to go if it needs more information. Aim to be a concise as possible to not overwhealm the AIs context. Seperate all logical sections with `\n---\n` and imediately after a seperator add a header with `#`. If possible, include direct links to relevant docs along side any component/class.
+You’ll write a condensed version of the documentation to ~/.docs. If there are any key references missing, fetch them from the web as well. The goal is to develop a solid understanding of the library. These docs are intended to provide an AI agent with a clear overview of the library or technology, including its usage and where to find additional information. Be as concise as possible to avoid overwhelming the AI's context.
+Separate each logical section with \n---\n, and immediately after the separator, include a header marked with #. Whenever possible, include direct links to the relevant documentation alongside any components or classes.
 ```
 Make sure you include individual links to every component for good reliability. This tool is really useful if you are working with a later version then what the AI is trained on. 
 
