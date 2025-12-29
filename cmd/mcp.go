@@ -131,7 +131,6 @@ func registerTasksTool(s *server.MCPServer) {
 	})
 }
 
-// readProposalSpecAndDesign reads only the specification and design documents (not implementation)
 func readProposalSpecAndDesign(proposalPath string) (string, error) {
 	var buf bytes.Buffer
 

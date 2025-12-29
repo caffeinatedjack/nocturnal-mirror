@@ -12,7 +12,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-//go:embed templates/*.md templates/proposal/*.md templates/help/*.txt
+//go:embed templates
 var templateFS embed.FS
 
 func helpText(name string) string {
@@ -363,7 +363,6 @@ func runSpecView(cmd *cobra.Command, args []string) {
 
 	fmt.Println()
 
-	// Section 1: Completed Specifications
 	sectionDirPath := filepath.Join(specPath, sectionDir)
 	sectionFiles, err := listMarkdownFiles(sectionDirPath)
 	if err != nil && !os.IsNotExist(err) {
@@ -395,7 +394,6 @@ func runSpecView(cmd *cobra.Command, args []string) {
 
 	fmt.Println()
 
-	// Section 2: Active Proposal
 	fmt.Println(boldStyle.Render("Active Proposal"))
 	fmt.Println()
 
@@ -417,7 +415,6 @@ func runSpecView(cmd *cobra.Command, args []string) {
 
 	fmt.Println()
 
-	// Section 3: Other Proposals
 	fmt.Println(boldStyle.Render("Other Proposals"))
 	fmt.Println()
 
@@ -489,7 +486,6 @@ func runSpecInit(cmd *cobra.Command, args []string) {
 		}
 	}
 
-	// Create template files in specification directory
 	templateFiles := []struct {
 		template string
 		filename string
@@ -530,7 +526,6 @@ func runSpecProposalAdd(cmd *cobra.Command, args []string) {
 	specPath := getSpecPath()
 	proposalPath := filepath.Join(specPath, proposalDir, slug)
 
-	// Check if specification workspace exists
 	if _, err := os.Stat(specPath); os.IsNotExist(err) {
 		printError("Specification workspace not initialized")
 		printDim("Run 'nocturnal spec init' first")
@@ -581,13 +576,11 @@ func runSpecProposalRemove(cmd *cobra.Command, args []string) {
 	proposalPath := filepath.Join(specPath, proposalDir, slug)
 	currentPath := filepath.Join(specPath, currentSymlink)
 
-	// Check if proposal exists
 	if _, err := os.Stat(proposalPath); os.IsNotExist(err) {
 		printError(fmt.Sprintf("Proposal '%s' does not exist", slug))
 		return
 	}
 
-	// Check if this is the active proposal
 	if !forceRemove {
 		if target, err := os.Readlink(currentPath); err == nil {
 			activeSlug := filepath.Base(target)
@@ -626,7 +619,6 @@ func runSpecProposalActivate(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	// Check if proposal exists
 	if _, err := os.Stat(proposalPath); os.IsNotExist(err) {
 		printError(fmt.Sprintf("Proposal '%s' does not exist", slug))
 		return
@@ -656,7 +648,6 @@ func runSpecProposalComplete(cmd *cobra.Command, args []string) {
 	sectionPath := filepath.Join(specPath, sectionDir)
 	currentPath := filepath.Join(specPath, currentSymlink)
 
-	// Check if proposal exists
 	if _, err := os.Stat(proposalPath); os.IsNotExist(err) {
 		printError(fmt.Sprintf("Proposal '%s' does not exist", slug))
 		return
@@ -716,8 +707,15 @@ func runSpecProposalComplete(cmd *cobra.Command, args []string) {
 
 func runSpecRuleAdd(cmd *cobra.Command, args []string) {
 	ruleName := args[0]
+	slug := nameToSlug(ruleName)
+
+	if slug == "" {
+		printError("Invalid rule name: must contain at least one alphanumeric character")
+		return
+	}
+
 	specPath := getSpecPath()
-	rulePath := filepath.Join(specPath, ruleDir, ruleName+".md")
+	rulePath := filepath.Join(specPath, ruleDir, slug+".md")
 
 	if _, err := os.Stat(specPath); os.IsNotExist(err) {
 		printError("Specification workspace not initialized")
@@ -726,7 +724,7 @@ func runSpecRuleAdd(cmd *cobra.Command, args []string) {
 	}
 
 	if _, err := os.Stat(rulePath); err == nil {
-		printError(fmt.Sprintf("Rule '%s' already exists", ruleName))
+		printError(fmt.Sprintf("Rule '%s' already exists", slug))
 		return
 	}
 
@@ -742,7 +740,7 @@ func runSpecRuleAdd(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	printSuccess(fmt.Sprintf("Created rule '%s'", ruleName))
+	printSuccess(fmt.Sprintf("Created rule '%s'", slug))
 	printDim(fmt.Sprintf("Location: %s", rulePath))
 }
 
@@ -1011,7 +1009,6 @@ func validateDesign(content string) ValidationResult {
 		}
 	}
 
-	// Check for metadata
 	hasTitle := containsText(content, "# Design:") || containsText(content, "# design:")
 	if !hasTitle {
 		result.Errors = append(result.Errors, "Missing metadata: Title should be 'Design: [Feature Name]'")
@@ -1027,7 +1024,6 @@ func validateDesign(content string) ValidationResult {
 		result.Warnings = append(result.Warnings, "Missing metadata: Status (Draft | Review | Approved | Superseded)")
 	}
 
-	// Check for multiple options in Options Considered section
 	hasOption1 := hasSectionPrefix(content, "Option 1") || hasSectionPrefix(content, "Option A")
 	hasOption2 := hasSectionPrefix(content, "Option 2") || hasSectionPrefix(content, "Option B")
 	if hasOption1 && !hasOption2 {
@@ -1064,14 +1060,12 @@ func runSpecProposalValidate(cmd *cobra.Command, args []string) {
 	specPath := getSpecPath()
 	proposalPath := filepath.Join(specPath, proposalDir, slug)
 
-	// Check if specification workspace exists
 	if _, err := os.Stat(specPath); os.IsNotExist(err) {
 		printError("Specification workspace not initialized")
 		printDim("Run 'nocturnal spec init' first")
 		return
 	}
 
-	// Check if proposal exists
 	if _, err := os.Stat(proposalPath); os.IsNotExist(err) {
 		printError(fmt.Sprintf("Proposal '%s' does not exist", slug))
 		return
@@ -1115,7 +1109,6 @@ func runSpecProposalValidate(cmd *cobra.Command, args []string) {
 		totalWarnings += len(result.Warnings)
 	}
 
-	// Print results
 	for _, result := range results {
 		hasIssues := len(result.Errors) > 0 || len(result.Warnings) > 0
 
