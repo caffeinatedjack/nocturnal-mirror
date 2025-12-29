@@ -1,0 +1,46 @@
+stages:
+  - test
+  - build
+
+variables:
+  BINARY_NAME: nocturnal
+  VERSION: ${CI_COMMIT_TAG:-${CI_COMMIT_SHORT_SHA}}
+  BUILD_TIME: ${CI_PIPELINE_CREATED_AT}
+  LDFLAGS: "-X main.Version=${VERSION} -X main.BuildTime=${BUILD_TIME}"
+
+test:
+  stage: test
+  image: golang:1.23
+  rules:
+    - when: manual
+  script:
+    - go mod download
+    - go test -v -race ./...
+
+build:linux:
+  stage: build
+  image: golang:1.23
+  needs:
+    - test
+  rules:
+    - when: manual
+  script:
+    - GOOS=linux GOARCH=amd64 go build -ldflags "${LDFLAGS}" -o ${BINARY_NAME}-linux-amd64 .
+  artifacts:
+    paths:
+      - ${BINARY_NAME}-linux-amd64
+    expire_in: 30 days
+
+build:windows:
+  stage: build
+  image: golang:1.23
+  needs:
+    - test
+  rules:
+    - when: manual
+  script:
+    - GOOS=windows GOARCH=amd64 go build -ldflags "${LDFLAGS}" -o ${BINARY_NAME}-windows-amd64.exe .
+  artifacts:
+    paths:
+      - ${BINARY_NAME}-windows-amd64.exe
+    expire_in: 30 days
