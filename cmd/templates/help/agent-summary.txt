@@ -1,0 +1,14 @@
+Show a complete project summary suitable for AI context.
+
+Outputs all relevant project information in a single stream:
+    1. Project rules (from specification/rule/)
+    2. Project design (from specification/project.md)
+    3. Completed specifications (from specification/section/)
+    4. Active proposal documents (specification, design, implementation)
+
+This command is designed to provide an AI agent with complete
+project context in one call, reducing the need for multiple
+tool invocations.
+
+Example:
+    nocturnal agent summary

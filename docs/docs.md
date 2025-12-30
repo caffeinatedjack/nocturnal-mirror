@@ -1,6 +1,6 @@
 # Documentation Management
 
-Nocturnal provides tools for managing third-party library and API documentation. This documentation is stored in `~/.docs` (I might change this) and can be accessed by AI agents through the MCP server or CLI commands.
+Nocturnal provides tools for managing third-party library and API documentation. This documentation is stored in `spec/third` and can be accessed by AI agents through the MCP server or CLI commands.
 
 ## Overview
 
@@ -14,7 +14,7 @@ THis does mean you need to have the libraries in a specific format so the search
 
 ## File Format
 
-Documentation files are stored in `~/.docs` as text or markdown files. Each file can contain multiple **components** separated by `---` dividers, with headers starting with `#`.
+Documentation files are stored in `spec/third` as text or markdown files. Each file can contain multiple **components** separated by `---` dividers, with headers starting with `#`.
 
 ```markdown
 ---
@@ -175,7 +175,7 @@ Generate condensed documentation for third-party libraries.
 Generates a prompt instructing the AI to:
 1. Fetch documentation from the provided URLs
 2. Create condensed, AI-friendly documentation
-3. Save to `~/.docs` directory
+3. Save to `spec/third` directory
 4. Structure content with `---` separators and `#` headers
 5. Include links to original documentation
 

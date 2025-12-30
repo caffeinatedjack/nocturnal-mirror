@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -36,6 +35,7 @@ func runMCP(cmd *cobra.Command, args []string) {
 	registerTasksTool(s)
 	registerDocsListTool(s)
 	registerDocsSearchTool(s)
+	registerSummaryTool(s)
 
 	registerAddThirdPartyDocsPrompt(s)
 
@@ -131,36 +131,9 @@ func registerTasksTool(s *server.MCPServer) {
 	})
 }
 
+// readProposalSpecAndDesign reads spec and design docs, excluding implementation.
 func readProposalSpecAndDesign(proposalPath string) (string, error) {
-	var buf bytes.Buffer
-
-	specDesignDocs := []struct {
-		Name string
-		File string
-	}{
-		{"Specification", "specification.md"},
-		{"Design", "design.md"},
-	}
-
-	for i, doc := range specDesignDocs {
-		filePath := filepath.Join(proposalPath, doc.File)
-		content, err := os.ReadFile(filePath)
-		if err != nil {
-			if os.IsNotExist(err) {
-				continue
-			}
-			continue
-		}
-
-		if i > 0 {
-			buf.WriteString("\n---\n\n")
-		}
-
-		buf.WriteString(fmt.Sprintf("## %s\n\n", doc.Name))
-		buf.Write(content)
-	}
-
-	return buf.String(), nil
+	return readProposalDocsFiltered(proposalPath, []string{"specification.md", "design.md"})
 }
 
 func registerDocsListTool(s *server.MCPServer) {
@@ -215,6 +188,26 @@ func registerDocsSearchTool(s *server.MCPServer) {
 	})
 }
 
+func registerSummaryTool(s *server.MCPServer) {
+	tool := mcp.NewTool("summary",
+		mcp.WithDescription("Get a complete project summary including rules, specifications, and active proposal. Ideal for loading full project context."),
+	)
+
+	s.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		specPath, err := checkSpecWorkspace()
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+
+		summary := buildProjectSummary(specPath)
+		if summary == "" {
+			return mcp.NewToolResultText("No project context found. Add rules, project.md, specifications, or activate a proposal."), nil
+		}
+
+		return mcp.NewToolResultText(summary), nil
+	})
+}
+
 func registerAddThirdPartyDocsPrompt(s *server.MCPServer) {
 	prompt := mcp.NewPrompt("add-third-party-docs",
 		mcp.WithPromptDescription("Generate condensed documentation for third-party libraries"),
@@ -227,7 +220,7 @@ func registerAddThirdPartyDocsPrompt(s *server.MCPServer) {
 	s.AddPrompt(prompt, func(ctx context.Context, request mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
 		urls, _ := request.Params.Arguments["urls"]
 
-		promptText := fmt.Sprintf(`You'll write a condensed version of the documentation to ~/.docs. If there are any key references missing, fetch them from the web as well. The goal is to develop a solid understanding of the library. These docs are intended to provide an AI agent with a clear overview of the library or technology, including its usage and where to find additional information. Be as concise as possible to avoid overwhelming the AI's context.
+		promptText := fmt.Sprintf(`You'll write a condensed version of the documentation to spec/third. If there are any key references missing, fetch them from the web as well. The goal is to develop a solid understanding of the library. These docs are intended to provide an AI agent with a clear overview of the library or technology, including its usage and where to find additional information. Be as concise as possible to avoid overwhelming the AI's context.
 
 Separate each logical section with \n---\n, and immediately after the separator, include a header marked with #. Whenever possible, include direct links to the relevant documentation alongside any components or classes.
 

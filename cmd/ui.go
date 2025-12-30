@@ -6,6 +6,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+// Terminal colors and styles for CLI output.
 var (
 	colorRed    = lipgloss.Color("9")
 	colorYellow = lipgloss.Color("11")

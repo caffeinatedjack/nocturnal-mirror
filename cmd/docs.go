@@ -12,7 +12,7 @@ import (
 
 var docsCmd = &cobra.Command{
 	Use:   "docs",
-	Short: "Manage documentation in ~/.docs directory",
+	Short: "Manage third-party documentation in spec/third",
 }
 
 var (
@@ -20,8 +20,7 @@ var (
 )
 
 func init() {
-	home, _ := os.UserHomeDir()
-	docsPath = filepath.Join(home, ".docs")
+	docsPath = filepath.Join(getSpecPath(), "third")
 
 	docsCmd.Long = helpText("agent-docs")
 	docsListCmd.Long = helpText("agent-docs-list")
@@ -31,16 +30,19 @@ func init() {
 	docsCmd.AddCommand(docsSearchCmd)
 }
 
+// RegisterDocsCommand adds the docs subcommand to a parent command.
 func RegisterDocsCommand(parent *cobra.Command) {
 	parent.AddCommand(docsCmd)
 }
 
+// DocComponent represents a named section from a documentation file.
 type DocComponent struct {
 	Name    string
 	Content string
 	Source  string
 }
 
+// formatDocsListOutput formats components as a list with previews.
 func formatDocsListOutput(components []*DocComponent) string {
 	var buf strings.Builder
 	buf.WriteString(fmt.Sprintf("Found %d component(s)\n\n", len(components)))
@@ -58,6 +60,7 @@ func formatDocsListOutput(components []*DocComponent) string {
 	return buf.String()
 }
 
+// searchDocs filters components by name (case-insensitive).
 func searchDocs(components []*DocComponent, query string) []*DocComponent {
 	queryLower := strings.ToLower(query)
 	var matches []*DocComponent
@@ -69,6 +72,7 @@ func searchDocs(components []*DocComponent, query string) []*DocComponent {
 	return matches
 }
 
+// formatDocsSearchOutput formats matched components with full content.
 func formatDocsSearchOutput(matches []*DocComponent) string {
 	var buf strings.Builder
 	buf.WriteString(fmt.Sprintf("Found %d result(s)\n\n", len(matches)))
@@ -83,6 +87,7 @@ func formatDocsSearchOutput(matches []*DocComponent) string {
 	return buf.String()
 }
 
+// loadDocs reads all documentation files from spec/third/.
 func loadDocs() ([]*DocComponent, error) {
 	info, err := os.Stat(docsPath)
 	if os.IsNotExist(err) {
@@ -121,6 +126,7 @@ func loadDocs() ([]*DocComponent, error) {
 	return components, nil
 }
 
+// parseDocFile extracts components from a file. Sections are delimited by ---.
 func parseDocFile(filePath string) ([]*DocComponent, error) {
 	file, err := os.Open(filePath)
 	if err != nil {

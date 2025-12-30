@@ -47,6 +47,7 @@ func initHelp() {
 	completionCmd.Long = helpText("completion")
 }
 
+// Execute runs the root command.
 func Execute() {
 	initHelp()
 	if err := rootCmd.Execute(); err != nil {

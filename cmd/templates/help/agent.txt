@@ -4,7 +4,7 @@ Commands:
     current         Show the currently active proposal
     project         Show project rules and design
     specifications  Show completed specifications (alias: specs)
-    docs            Search/list components in ~/.docs
+    docs            Search/list components in spec/third
 
 Examples:
     nocturnal agent current

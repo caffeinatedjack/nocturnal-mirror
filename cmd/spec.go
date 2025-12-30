@@ -15,6 +15,7 @@ import (
 //go:embed templates
 var templateFS embed.FS
 
+// helpText loads a help text file from the embedded templates.
 func helpText(name string) string {
 	content, err := templateFS.ReadFile("templates/help/" + name + ".txt")
 	if err != nil {
@@ -23,6 +24,7 @@ func helpText(name string) string {
 	return string(content)
 }
 
+// renderTemplate executes a Go template with the given data and returns the result.
 func renderTemplate(templatePath string, data any) (string, error) {
 	content, err := templateFS.ReadFile(templatePath)
 	if err != nil {
@@ -42,6 +44,7 @@ func renderTemplate(templatePath string, data any) (string, error) {
 	return buf.String(), nil
 }
 
+// readTemplate reads a template file without executing it.
 func readTemplate(templatePath string) (string, error) {
 	content, err := templateFS.ReadFile(templatePath)
 	if err != nil {
@@ -97,6 +100,13 @@ var specProposalActivateCmd = &cobra.Command{
 	ValidArgsFunction: completeProposalNames,
 }
 
+var specProposalDeactivateCmd = &cobra.Command{
+	Use:   "deactivate",
+	Short: "Deactivate the current proposal",
+	Args:  cobra.NoArgs,
+	Run:   runSpecProposalDeactivate,
+}
+
 var specProposalCompleteCmd = &cobra.Command{
 	Use:               "complete <change-slug>",
 	Short:             "Complete and promote a proposal",
@@ -111,6 +121,26 @@ var specProposalValidateCmd = &cobra.Command{
 	Args:              cobra.ExactArgs(1),
 	Run:               runSpecProposalValidate,
 	ValidArgsFunction: completeProposalNames,
+}
+
+var specProposalListCmd = &cobra.Command{
+	Use:   "list",
+	Short: "List all proposals with status and progress",
+	Run:   runSpecProposalList,
+}
+
+var specProposalAbandonCmd = &cobra.Command{
+	Use:               "abandon <change-slug>",
+	Short:             "Abandon a proposal and archive it without promoting",
+	Args:              cobra.ExactArgs(1),
+	Run:               runSpecProposalAbandon,
+	ValidArgsFunction: completeProposalNames,
+}
+
+var agentSummaryCmd = &cobra.Command{
+	Use:   "summary",
+	Short: "Show a complete project summary for AI context",
+	Run:   runAgentSummary,
 }
 
 var specRuleCmd = &cobra.Command{
@@ -158,14 +188,18 @@ func init() {
 	specProposalAddCmd.Long = helpText("spec-proposal-add")
 	specProposalRemoveCmd.Long = helpText("spec-proposal-remove")
 	specProposalActivateCmd.Long = helpText("spec-proposal-activate")
+	specProposalDeactivateCmd.Long = helpText("spec-proposal-deactivate")
 	specProposalCompleteCmd.Long = helpText("spec-proposal-complete")
 	specProposalValidateCmd.Long = helpText("spec-proposal-validate")
+	specProposalListCmd.Long = helpText("spec-proposal-list")
+	specProposalAbandonCmd.Long = helpText("spec-proposal-abandon")
 	specRuleCmd.Long = helpText("spec-rule")
 	specRuleAddCmd.Long = helpText("spec-rule-add")
 	specRuleShowCmd.Long = helpText("spec-rule-show")
 	agentCurrentCmd.Long = helpText("agent-current")
 	agentProjectCmd.Long = helpText("agent-project")
 	agentSpecificationsCmd.Long = helpText("agent-specs")
+	agentSummaryCmd.Long = helpText("agent-summary")
 
 	rootCmd.AddCommand(specCmd)
 
@@ -177,8 +211,11 @@ func init() {
 	specProposalCmd.AddCommand(specProposalAddCmd)
 	specProposalCmd.AddCommand(specProposalRemoveCmd)
 	specProposalCmd.AddCommand(specProposalActivateCmd)
+	specProposalCmd.AddCommand(specProposalDeactivateCmd)
 	specProposalCmd.AddCommand(specProposalCompleteCmd)
 	specProposalCmd.AddCommand(specProposalValidateCmd)
+	specProposalCmd.AddCommand(specProposalListCmd)
+	specProposalCmd.AddCommand(specProposalAbandonCmd)
 
 	specProposalRemoveCmd.Flags().BoolVarP(&forceRemove, "force", "f", false, "Force removal even if proposal is active")
 
@@ -188,6 +225,7 @@ func init() {
 	agentCmd.AddCommand(agentCurrentCmd)
 	agentCmd.AddCommand(agentProjectCmd)
 	agentCmd.AddCommand(agentSpecificationsCmd)
+	agentCmd.AddCommand(agentSummaryCmd)
 }
 
 var proposalDocs = []struct {
@@ -199,22 +237,33 @@ var proposalDocs = []struct {
 	{"Implementation", "implementation.md"},
 }
 
+// readProposalDocs reads all proposal documents (spec, design, implementation)
 func readProposalDocs(proposalPath string) (string, error) {
-	var buf bytes.Buffer
+	return readProposalDocsFiltered(proposalPath, nil)
+}
 
-	for i, doc := range proposalDocs {
-		filePath := filepath.Join(proposalPath, doc.File)
-		content, err := os.ReadFile(filePath)
-		if err != nil {
-			if os.IsNotExist(err) {
-				continue
-			}
+// readProposalDocsFiltered reads proposal documents, optionally filtering to specific files
+// If files is nil or empty, all documents are read
+func readProposalDocsFiltered(proposalPath string, files []string) (string, error) {
+	var buf bytes.Buffer
+	first := true
+
+	for _, doc := range proposalDocs {
+		// Skip if filtering and file not in list
+		if len(files) > 0 && !contains(files, doc.File) {
 			continue
 		}
 
-		if i > 0 {
+		filePath := filepath.Join(proposalPath, doc.File)
+		content, err := os.ReadFile(filePath)
+		if err != nil {
+			continue
+		}
+
+		if !first {
 			buf.WriteString("\n---\n\n")
 		}
+		first = false
 
 		buf.WriteString(fmt.Sprintf("## %s\n\n", doc.Name))
 		buf.Write(content)
@@ -223,6 +272,17 @@ func readProposalDocs(proposalPath string) (string, error) {
 	return buf.String(), nil
 }
 
+// contains checks if a string slice contains a value
+func contains(slice []string, val string) bool {
+	for _, s := range slice {
+		if s == val {
+			return true
+		}
+	}
+	return false
+}
+
+// readRulesAndProject concatenates all rules and project.md into a single string.
 func readRulesAndProject(specPath string) (string, error) {
 	var buf bytes.Buffer
 	hasOutput := false
@@ -262,6 +322,7 @@ func readRulesAndProject(specPath string) (string, error) {
 	return buf.String(), nil
 }
 
+// readSpecifications concatenates all completed specifications from section/.
 func readSpecifications(specPath string) (string, error) {
 	sectionDirPath := filepath.Join(specPath, sectionDir)
 	sectionFiles, err := listMarkdownFiles(sectionDirPath)
@@ -298,6 +359,7 @@ func readSpecifications(specPath string) (string, error) {
 	return buf.String(), nil
 }
 
+// completeProposalNames provides shell completion for proposal names.
 func completeProposalNames(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 	if len(args) != 0 {
 		return nil, cobra.ShellCompDirectiveNoFileComp
@@ -321,6 +383,7 @@ func completeProposalNames(cmd *cobra.Command, args []string, toComplete string)
 	return proposals, cobra.ShellCompDirectiveNoFileComp
 }
 
+// countRequirements counts lines containing MUST or SHALL keywords.
 func countRequirements(content string) int {
 	count := 0
 	lines := strings.Split(content, "\n")
@@ -333,6 +396,7 @@ func countRequirements(content string) int {
 	return count
 }
 
+// getProposalProgress counts task checkboxes in implementation.md.
 func getProposalProgress(proposalPath string) (total int, completed int) {
 	implPath := filepath.Join(proposalPath, "implementation.md")
 	content, err := os.ReadFile(implPath)
@@ -356,8 +420,7 @@ func getProposalProgress(proposalPath string) (total int, completed int) {
 func runSpecView(cmd *cobra.Command, args []string) {
 	specPath, err := checkSpecWorkspace()
 	if err != nil {
-		printError("Specification workspace not initialized")
-		printDim("Run 'nocturnal spec init' first")
+		printWorkspaceError()
 		return
 	}
 
@@ -464,6 +527,7 @@ func runSpecView(cmd *cobra.Command, args []string) {
 	fmt.Println()
 }
 
+// renderProgressBar creates a visual progress bar using block characters.
 func renderProgressBar(completed, total, width int) string {
 	if total == 0 {
 		return dimStyle.Render("[" + strings.Repeat("-", width) + "]")
@@ -537,14 +601,12 @@ func runSpecProposalAdd(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	specPath := getSpecPath()
-	proposalPath := filepath.Join(specPath, proposalDir, slug)
-
-	if _, err := os.Stat(specPath); os.IsNotExist(err) {
-		printError("Specification workspace not initialized")
-		printDim("Run 'nocturnal spec init' first")
+	specPath, err := checkSpecWorkspace()
+	if err != nil {
+		printWorkspaceError()
 		return
 	}
+	proposalPath := filepath.Join(specPath, proposalDir, slug)
 
 	if _, err := os.Stat(proposalPath); err == nil {
 		printError(fmt.Sprintf("Proposal '%s' already exists", slug))
@@ -587,13 +649,12 @@ func runSpecProposalAdd(cmd *cobra.Command, args []string) {
 func runSpecProposalRemove(cmd *cobra.Command, args []string) {
 	slug := args[0]
 	specPath := getSpecPath()
-	proposalPath := filepath.Join(specPath, proposalDir, slug)
-	currentPath := filepath.Join(specPath, currentSymlink)
-
-	if _, err := os.Stat(proposalPath); os.IsNotExist(err) {
-		printError(fmt.Sprintf("Proposal '%s' does not exist", slug))
+	proposalPath, err := checkProposal(specPath, slug)
+	if err != nil {
+		printError(err.Error())
 		return
 	}
+	currentPath := filepath.Join(specPath, currentSymlink)
 
 	if !forceRemove {
 		if target, err := os.Readlink(currentPath); err == nil {
@@ -611,32 +672,23 @@ func runSpecProposalRemove(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	if target, err := os.Readlink(currentPath); err == nil {
-		activeSlug := filepath.Base(target)
-		if activeSlug == slug {
-			os.Remove(currentPath)
-		}
-	}
-
+	clearActiveProposalIfMatches(specPath, slug)
 	printSuccess(fmt.Sprintf("Removed proposal '%s'", slug))
 }
 
 func runSpecProposalActivate(cmd *cobra.Command, args []string) {
 	slug := args[0]
-	specPath := getSpecPath()
-	proposalPath := filepath.Join(specPath, proposalDir, slug)
+	specPath, err := checkSpecWorkspace()
+	if err != nil {
+		printWorkspaceError()
+		return
+	}
+
+	if _, err := checkProposal(specPath, slug); err != nil {
+		printError(err.Error())
+		return
+	}
 	currentPath := filepath.Join(specPath, currentSymlink)
-
-	if _, err := os.Stat(specPath); os.IsNotExist(err) {
-		printError("Specification workspace not initialized")
-		printDim("Run 'nocturnal spec init' first")
-		return
-	}
-
-	if _, err := os.Stat(proposalPath); os.IsNotExist(err) {
-		printError(fmt.Sprintf("Proposal '%s' does not exist", slug))
-		return
-	}
 
 	// Check if any other proposals depend on this one
 	dependents, err := findDependentProposals(specPath, slug)
@@ -667,48 +719,58 @@ func runSpecProposalActivate(cmd *cobra.Command, args []string) {
 	printSuccess(fmt.Sprintf("Activated proposal '%s'", slug))
 }
 
-func runSpecProposalComplete(cmd *cobra.Command, args []string) {
-	slug := args[0]
-	specPath := getSpecPath()
-	proposalPath := filepath.Join(specPath, proposalDir, slug)
-	archivePath := filepath.Join(specPath, archiveDir, slug)
-	sectionPath := filepath.Join(specPath, sectionDir)
-	currentPath := filepath.Join(specPath, currentSymlink)
-
-	if _, err := os.Stat(proposalPath); os.IsNotExist(err) {
-		printError(fmt.Sprintf("Proposal '%s' does not exist", slug))
+func runSpecProposalDeactivate(cmd *cobra.Command, args []string) {
+	specPath, err := checkSpecWorkspace()
+	if err != nil {
+		printWorkspaceError()
 		return
 	}
 
+	currentPath := filepath.Join(specPath, currentSymlink)
+
+	slug, _, err := getActiveProposal(specPath)
+	if err != nil {
+		printWarning(err.Error())
+		return
+	}
+	if slug == "" {
+		printDim("No active proposal to deactivate")
+		return
+	}
+
+	if err := os.Remove(currentPath); err != nil {
+		printError(fmt.Sprintf("Failed to remove symlink: %v", err))
+		return
+	}
+
+	printSuccess(fmt.Sprintf("Deactivated proposal '%s'", slug))
+}
+
+func runSpecProposalComplete(cmd *cobra.Command, args []string) {
+	slug := args[0]
+	specPath := getSpecPath()
+	proposalPath, err := checkProposal(specPath, slug)
+	if err != nil {
+		printError(err.Error())
+		return
+	}
+
+	archivePath := filepath.Join(specPath, archiveDir, slug)
+	sectionPath := filepath.Join(specPath, sectionDir)
+
 	specFile := filepath.Join(proposalPath, "specification.md")
-	if _, err := os.Stat(specFile); os.IsNotExist(err) {
+	if !fileExists(specFile) {
 		printError(fmt.Sprintf("Proposal '%s' is missing specification.md", slug))
 		return
 	}
 
-	if err := os.MkdirAll(archivePath, 0755); err != nil {
-		printError(fmt.Sprintf("Failed to create archive directory: %v", err))
+	// Archive design and implementation documents
+	if err := archiveProposalDocs(proposalPath, archivePath, []string{"design.md", "implementation.md"}); err != nil {
+		printError(err.Error())
 		return
 	}
 
-	designSrc := filepath.Join(proposalPath, "design.md")
-	if _, err := os.Stat(designSrc); err == nil {
-		designDst := filepath.Join(archivePath, "design.md")
-		if err := copyFile(designSrc, designDst); err != nil {
-			printError(fmt.Sprintf("Failed to archive design.md: %v", err))
-			return
-		}
-	}
-
-	implSrc := filepath.Join(proposalPath, "implementation.md")
-	if _, err := os.Stat(implSrc); err == nil {
-		implDst := filepath.Join(archivePath, "implementation.md")
-		if err := copyFile(implSrc, implDst); err != nil {
-			printError(fmt.Sprintf("Failed to archive implementation.md: %v", err))
-			return
-		}
-	}
-
+	// Promote specification to section
 	specDst := filepath.Join(sectionPath, slug+".md")
 	if err := copyFile(specFile, specDst); err != nil {
 		printError(fmt.Sprintf("Failed to promote specification: %v", err))
@@ -720,13 +782,7 @@ func runSpecProposalComplete(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	if target, err := os.Readlink(currentPath); err == nil {
-		activeSlug := filepath.Base(target)
-		if activeSlug == slug {
-			os.Remove(currentPath)
-		}
-	}
-
+	clearActiveProposalIfMatches(specPath, slug)
 	printSuccess(fmt.Sprintf("Completed proposal '%s'", slug))
 	printDim(fmt.Sprintf("Specification promoted to %s/%s.md", sectionDir, slug))
 	printDim(fmt.Sprintf("Design/implementation archived to %s/%s/", archiveDir, slug))
@@ -741,14 +797,12 @@ func runSpecRuleAdd(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	specPath := getSpecPath()
-	rulePath := filepath.Join(specPath, ruleDir, slug+".md")
-
-	if _, err := os.Stat(specPath); os.IsNotExist(err) {
-		printError("Specification workspace not initialized")
-		printDim("Run 'nocturnal spec init' first")
+	specPath, err := checkSpecWorkspace()
+	if err != nil {
+		printWorkspaceError()
 		return
 	}
+	rulePath := filepath.Join(specPath, ruleDir, slug+".md")
 
 	if _, err := os.Stat(rulePath); err == nil {
 		printError(fmt.Sprintf("Rule '%s' already exists", slug))
@@ -774,8 +828,7 @@ func runSpecRuleAdd(cmd *cobra.Command, args []string) {
 func runSpecRuleShow(cmd *cobra.Command, args []string) {
 	specPath, err := checkSpecWorkspace()
 	if err != nil {
-		printError("Specification workspace not initialized")
-		printDim("Run 'nocturnal spec init' first")
+		printWorkspaceError()
 		return
 	}
 
@@ -820,8 +873,7 @@ func runSpecRuleShow(cmd *cobra.Command, args []string) {
 func runAgentCurrent(cmd *cobra.Command, args []string) {
 	specPath, err := checkSpecWorkspace()
 	if err != nil {
-		printError("Specification workspace not initialized")
-		printDim("Run 'nocturnal spec init' first")
+		printWorkspaceError()
 		return
 	}
 
@@ -865,8 +917,7 @@ func runAgentCurrent(cmd *cobra.Command, args []string) {
 func runAgentProject(cmd *cobra.Command, args []string) {
 	specPath, err := checkSpecWorkspace()
 	if err != nil {
-		printError("Specification workspace not initialized")
-		printDim("Run 'nocturnal spec init' first")
+		printWorkspaceError()
 		return
 	}
 
@@ -887,8 +938,7 @@ func runAgentProject(cmd *cobra.Command, args []string) {
 func runAgentSpecifications(cmd *cobra.Command, args []string) {
 	specPath, err := checkSpecWorkspace()
 	if err != nil {
-		printError("Specification workspace not initialized")
-		printDim("Run 'nocturnal spec init' first")
+		printWorkspaceError()
 		return
 	}
 
@@ -907,52 +957,19 @@ func runAgentSpecifications(cmd *cobra.Command, args []string) {
 	fmt.Print(content)
 }
 
+// ValidationResult holds errors and warnings from document validation.
 type ValidationResult struct {
 	Document string
 	Errors   []string
 	Warnings []string
 }
 
-func hasSection(content, sectionName string) bool {
-	lines := strings.Split(content, "\n")
-	lowerName := strings.ToLower(sectionName)
-	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "#") {
-			heading := strings.TrimLeft(trimmed, "#")
-			heading = strings.TrimSpace(heading)
-			heading = strings.Trim(heading, "*:")
-			heading = strings.TrimSpace(heading)
-			if strings.ToLower(heading) == lowerName {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-func hasSectionPrefix(content, prefix string) bool {
-	lines := strings.Split(content, "\n")
-	lowerPrefix := strings.ToLower(prefix)
-	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "#") {
-			heading := strings.TrimLeft(trimmed, "#")
-			heading = strings.TrimSpace(heading)
-			heading = strings.Trim(heading, "*:")
-			heading = strings.TrimSpace(heading)
-			if strings.HasPrefix(strings.ToLower(heading), lowerPrefix) {
-				return true
-			}
-		}
-	}
-	return false
-}
-
+// containsText checks if content contains text (case-insensitive)
 func containsText(content, text string) bool {
 	return strings.Contains(strings.ToLower(content), strings.ToLower(text))
 }
 
+// validateSpecification checks for required sections and normative language.
 func validateSpecification(content string) ValidationResult {
 	result := ValidationResult{Document: "specification.md"}
 
@@ -976,18 +993,18 @@ func validateSpecification(content string) ValidationResult {
 	}
 
 	for _, section := range requiredSections {
-		if section.required && !hasSection(content, section.name) && !hasSectionPrefix(content, section.name) {
+		if section.required && !containsHeaderWithText(content, section.name) {
 			result.Errors = append(result.Errors, fmt.Sprintf("Missing required section: %s - %s", section.name, section.hint))
 		}
 	}
 
 	for _, section := range recommendedSections {
-		if !hasSection(content, section.name) && !hasSectionPrefix(content, section.name) {
+		if !containsHeaderWithText(content, section.name) {
 			result.Warnings = append(result.Warnings, fmt.Sprintf("Missing recommended section: %s - %s", section.name, section.hint))
 		}
 	}
 
-	if hasSection(content, "Requirements") || hasSectionPrefix(content, "Requirements") {
+	if containsHeaderWithText(content, "Requirements") {
 		hasNormative := containsText(content, "MUST") || containsText(content, "SHOULD") || containsText(content, "MAY")
 		if !hasNormative {
 			result.Warnings = append(result.Warnings, "Requirements section should use normative language (MUST/SHOULD/MAY)")
@@ -1001,6 +1018,7 @@ func validateSpecification(content string) ValidationResult {
 	return result
 }
 
+// validateDesign checks for required design doc sections and metadata.
 func validateDesign(content string) ValidationResult {
 	result := ValidationResult{Document: "design.md"}
 
@@ -1025,13 +1043,13 @@ func validateDesign(content string) ValidationResult {
 	}
 
 	for _, section := range requiredSections {
-		if !hasSection(content, section.name) && !hasSectionPrefix(content, section.name) {
+		if !containsHeaderWithText(content, section.name) {
 			result.Errors = append(result.Errors, fmt.Sprintf("Missing required section: %s - %s", section.name, section.hint))
 		}
 	}
 
 	for _, section := range recommendedSections {
-		if !hasSection(content, section.name) && !hasSectionPrefix(content, section.name) {
+		if !containsHeaderWithText(content, section.name) {
 			result.Warnings = append(result.Warnings, fmt.Sprintf("Missing recommended section: %s - %s", section.name, section.hint))
 		}
 	}
@@ -1051,8 +1069,8 @@ func validateDesign(content string) ValidationResult {
 		result.Warnings = append(result.Warnings, "Missing metadata: Status (Draft | Review | Approved | Superseded)")
 	}
 
-	hasOption1 := hasSectionPrefix(content, "Option 1") || hasSectionPrefix(content, "Option A")
-	hasOption2 := hasSectionPrefix(content, "Option 2") || hasSectionPrefix(content, "Option B")
+	hasOption1 := containsHeaderWithText(content, "Option 1") || containsHeaderWithText(content, "Option A")
+	hasOption2 := containsHeaderWithText(content, "Option 2") || containsHeaderWithText(content, "Option B")
 	if hasOption1 && !hasOption2 {
 		result.Warnings = append(result.Warnings, "Only one option documented - guidelines require at least 2 alternatives or justification")
 	}
@@ -1064,10 +1082,11 @@ func validateDesign(content string) ValidationResult {
 	return result
 }
 
+// validateImplementation checks for phases and task checkboxes.
 func validateImplementation(content string) ValidationResult {
 	result := ValidationResult{Document: "implementation.md"}
 
-	if !hasSectionPrefix(content, "Phase") {
+	if !containsHeaderWithText(content, "Phase") {
 		result.Errors = append(result.Errors, "Missing phases - implementation should be broken into phases")
 	}
 
@@ -1084,17 +1103,15 @@ func validateImplementation(content string) ValidationResult {
 
 func runSpecProposalValidate(cmd *cobra.Command, args []string) {
 	slug := args[0]
-	specPath := getSpecPath()
-	proposalPath := filepath.Join(specPath, proposalDir, slug)
-
-	if _, err := os.Stat(specPath); os.IsNotExist(err) {
-		printError("Specification workspace not initialized")
-		printDim("Run 'nocturnal spec init' first")
+	specPath, err := checkSpecWorkspace()
+	if err != nil {
+		printWorkspaceError()
 		return
 	}
 
-	if _, err := os.Stat(proposalPath); os.IsNotExist(err) {
-		printError(fmt.Sprintf("Proposal '%s' does not exist", slug))
+	proposalPath, err := checkProposal(specPath, slug)
+	if err != nil {
+		printError(err.Error())
 		return
 	}
 
@@ -1171,4 +1188,180 @@ func runSpecProposalValidate(cmd *cobra.Command, args []string) {
 			printWarning(summary)
 		}
 	}
+}
+
+func runSpecProposalList(cmd *cobra.Command, args []string) {
+	specPath, err := checkSpecWorkspace()
+	if err != nil {
+		printWorkspaceError()
+		return
+	}
+
+	proposalsPath := filepath.Join(specPath, proposalDir)
+	entries, err := os.ReadDir(proposalsPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			printDim("No proposals found")
+			return
+		}
+		printError(fmt.Sprintf("Failed to read proposals directory: %v", err))
+		return
+	}
+
+	activeSlug := getActiveProposalSlug(specPath)
+
+	var proposals []string
+	for _, entry := range entries {
+		if entry.IsDir() {
+			proposals = append(proposals, entry.Name())
+		}
+	}
+
+	if len(proposals) == 0 {
+		printDim("No proposals found")
+		printDim("Use 'nocturnal spec proposal add <name>' to create one")
+		return
+	}
+
+	fmt.Println()
+	fmt.Println(boldStyle.Render(fmt.Sprintf("Proposals (%d)", len(proposals))))
+	fmt.Println()
+
+	// Header
+	fmt.Printf("  %-20s %-10s %-15s %s\n",
+		dimStyle.Render("NAME"),
+		dimStyle.Render("STATUS"),
+		dimStyle.Render("PROGRESS"),
+		dimStyle.Render("DEPENDENCIES"))
+	fmt.Println()
+
+	for _, name := range proposals {
+		propPath := filepath.Join(proposalsPath, name)
+		total, completed := getProposalProgress(propPath)
+		deps, _ := getProposalDependencies(propPath)
+
+		// Status
+		status := dimStyle.Render("inactive")
+		if name == activeSlug {
+			status = successStyle.Render("active")
+		}
+
+		// Progress
+		var progress string
+		if total > 0 {
+			percentage := (completed * 100) / total
+			progress = fmt.Sprintf("%d%% (%d/%d)", percentage, completed, total)
+		} else {
+			progress = dimStyle.Render("no tasks")
+		}
+
+		// Dependencies
+		var depsStr string
+		if len(deps) > 0 {
+			depsStr = strings.Join(deps, ", ")
+		} else {
+			depsStr = dimStyle.Render("-")
+		}
+
+		// Name with indicator
+		displayName := name
+		if name == activeSlug {
+			displayName = infoStyle.Render(name)
+		}
+
+		fmt.Printf("  %-20s %-10s %-15s %s\n", displayName, status, progress, depsStr)
+	}
+	fmt.Println()
+}
+
+func runSpecProposalAbandon(cmd *cobra.Command, args []string) {
+	slug := args[0]
+	specPath, err := checkSpecWorkspace()
+	if err != nil {
+		printWorkspaceError()
+		return
+	}
+
+	proposalPath, err := checkProposal(specPath, slug)
+	if err != nil {
+		printError(err.Error())
+		return
+	}
+
+	archivePath := filepath.Join(specPath, archiveDir, slug)
+
+	// Archive all proposal documents
+	if err := archiveProposalDocs(proposalPath, archivePath, proposalDocFiles); err != nil {
+		printError(err.Error())
+		return
+	}
+
+	// Create an abandoned marker file
+	abandonedPath := filepath.Join(archivePath, ".abandoned")
+	if err := os.WriteFile(abandonedPath, []byte(""), 0644); err != nil {
+		printWarning(fmt.Sprintf("Failed to create abandoned marker: %v", err))
+	}
+
+	// Remove the proposal directory
+	if err := os.RemoveAll(proposalPath); err != nil {
+		printError(fmt.Sprintf("Failed to remove proposal workspace: %v", err))
+		return
+	}
+
+	clearActiveProposalIfMatches(specPath, slug)
+	printSuccess(fmt.Sprintf("Abandoned proposal '%s'", slug))
+	printDim(fmt.Sprintf("Archived to %s/%s/", archiveDir, slug))
+}
+
+// buildProjectSummary creates a complete project summary including rules, specs, and active proposal
+func buildProjectSummary(specPath string) string {
+	var buf bytes.Buffer
+
+	// Project rules and design
+	rulesContent, err := readRulesAndProject(specPath)
+	if err == nil && rulesContent != "" {
+		buf.WriteString(rulesContent)
+	}
+
+	// Completed specifications
+	specsContent, err := readSpecifications(specPath)
+	if err == nil && specsContent != "" {
+		if buf.Len() > 0 {
+			buf.WriteString("\n---\n\n")
+		}
+		buf.WriteString(specsContent)
+	}
+
+	// Active proposal
+	slug, proposalPath, err := getActiveProposal(specPath)
+	if err == nil && slug != "" {
+		if buf.Len() > 0 {
+			buf.WriteString("\n---\n\n")
+		}
+		buf.WriteString(fmt.Sprintf("# Active Proposal: %s\n\n", slug))
+
+		proposalContent, err := readProposalDocs(proposalPath)
+		if err == nil && proposalContent != "" {
+			buf.WriteString(proposalContent)
+		}
+	}
+
+	return buf.String()
+}
+
+func runAgentSummary(cmd *cobra.Command, args []string) {
+	specPath, err := checkSpecWorkspace()
+	if err != nil {
+		printWorkspaceError()
+		return
+	}
+
+	summary := buildProjectSummary(specPath)
+	if summary == "" {
+		printDim("No project context found")
+		printDim("Add rules, project.md, specifications, or activate a proposal")
+		return
+	}
+
+	fmt.Print(summary)
 }

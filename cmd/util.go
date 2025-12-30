@@ -8,6 +8,7 @@ import (
 	"strings"
 )
 
+// copyFile copies a file from src to dst with 0644 permissions.
 func copyFile(src, dst string) error {
 	content, err := os.ReadFile(src)
 	if err != nil {
@@ -16,6 +17,7 @@ func copyFile(src, dst string) error {
 	return os.WriteFile(dst, content, 0644)
 }
 
+// listMarkdownFiles returns sorted .md filenames in a directory.
 func listMarkdownFiles(dirPath string) ([]string, error) {
 	entries, err := os.ReadDir(dirPath)
 	if err != nil {
@@ -32,11 +34,13 @@ func listMarkdownFiles(dirPath string) ([]string, error) {
 	return files, nil
 }
 
+// fileExists returns true if the path exists.
 func fileExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
 }
 
+// cwdPath joins path elements with the current working directory.
 func cwdPath(elem ...string) string {
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -57,20 +61,14 @@ const (
 	agentsFile     = "AGENTS.md"
 )
 
+var proposalDocFiles = []string{"specification.md", "design.md", "implementation.md"}
+
+// getSpecPath returns the path to the spec/ directory.
 func getSpecPath() string {
 	return cwdPath(specDir)
 }
 
-func requireSpecWorkspace() string {
-	specPath := getSpecPath()
-	if !fileExists(specPath) {
-		printError("Specification workspace not initialized")
-		printDim("Run 'nocturnal spec init' first")
-		return ""
-	}
-	return specPath
-}
-
+// checkSpecWorkspace returns the spec path or an error if not initialized.
 func checkSpecWorkspace() (string, error) {
 	specPath := getSpecPath()
 	if !fileExists(specPath) {
@@ -79,20 +77,22 @@ func checkSpecWorkspace() (string, error) {
 	return specPath, nil
 }
 
-func requireProposal(slug string) string {
-	specPath := requireSpecWorkspace()
-	if specPath == "" {
-		return ""
-	}
-
+// checkProposal returns the proposal path or an error if it doesn't exist.
+func checkProposal(specPath, slug string) (string, error) {
 	proposalPath := filepath.Join(specPath, proposalDir, slug)
 	if !fileExists(proposalPath) {
-		printError(fmt.Sprintf("Proposal '%s' does not exist", slug))
-		return ""
+		return "", fmt.Errorf("proposal '%s' does not exist", slug)
 	}
-	return proposalPath
+	return proposalPath, nil
 }
 
+// printWorkspaceError prints the standard workspace not initialized error
+func printWorkspaceError() {
+	printError("Specification workspace not initialized")
+	printDim("Run 'nocturnal spec init' first")
+}
+
+// getActiveProposalSlug returns the active proposal name, or empty if none.
 func getActiveProposalSlug(specPath string) string {
 	currentPath := filepath.Join(specPath, currentSymlink)
 	target, err := os.Readlink(currentPath)
@@ -102,6 +102,7 @@ func getActiveProposalSlug(specPath string) string {
 	return filepath.Base(target)
 }
 
+// getActiveProposal returns the active proposal's slug and path.
 func getActiveProposal(specPath string) (slug string, proposalPath string, err error) {
 	currentPath := filepath.Join(specPath, currentSymlink)
 
@@ -123,12 +124,32 @@ func getActiveProposal(specPath string) (slug string, proposalPath string, err e
 	return slug, proposalPath, nil
 }
 
+// clearActiveProposalIfMatches removes the current symlink if it points to slug.
 func clearActiveProposalIfMatches(specPath, slug string) {
 	if getActiveProposalSlug(specPath) == slug {
 		os.Remove(filepath.Join(specPath, currentSymlink))
 	}
 }
 
+// archiveProposalDocs copies proposal documents to the archive directory
+func archiveProposalDocs(proposalPath, archivePath string, files []string) error {
+	if err := os.MkdirAll(archivePath, 0755); err != nil {
+		return fmt.Errorf("failed to create archive directory: %w", err)
+	}
+
+	for _, filename := range files {
+		src := filepath.Join(proposalPath, filename)
+		if fileExists(src) {
+			dst := filepath.Join(archivePath, filename)
+			if err := copyFile(src, dst); err != nil {
+				return fmt.Errorf("failed to archive %s: %w", filename, err)
+			}
+		}
+	}
+	return nil
+}
+
+// getContentPreview returns the first line of content, truncated to 60 chars.
 func getContentPreview(content string) string {
 	preview := content
 	if idx := strings.Index(preview, "\n"); idx > 0 {
@@ -140,6 +161,7 @@ func getContentPreview(content string) string {
 	return preview
 }
 
+// nameToSlug converts a name to a URL-safe lowercase slug.
 func nameToSlug(name string) string {
 	slug := strings.ToLower(name)
 
@@ -159,6 +181,20 @@ func nameToSlug(name string) string {
 	}
 
 	return strings.TrimSuffix(result.String(), "-")
+}
+
+// containsHeaderWithText checks if content has a markdown header containing the given text (case-insensitive)
+func containsHeaderWithText(content, text string) bool {
+	lowerText := strings.ToLower(text)
+	for _, line := range strings.Split(content, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "#") {
+			if strings.Contains(strings.ToLower(trimmed), lowerText) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // getProposalDependencies reads the specification.md file and extracts the "Depends on" field

@@ -1,6 +1,6 @@
-Manage documentation stored in the ~/.docs directory.
+Manage third-party documentation stored in the spec/third directory.
 
-The ~/.docs directory can contain multiple documentation files. Each file
+The spec/third directory can contain multiple documentation files. Each file
 contains documentation components separated by '---' with headers starting
 with '# component'.
 

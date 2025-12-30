@@ -4,5 +4,6 @@ Commands:
     add         Create a new proposal
     remove      Remove a proposal
     activate    Activate a proposal
+    deactivate  Deactivate the current proposal
     complete    Complete and promote a proposal
     validate    Validate proposal against guidelines

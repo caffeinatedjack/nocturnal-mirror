@@ -189,7 +189,7 @@ nocturnal spec proposal complete my-feature # Archive and promote
 - Templates are embedded using `//go:embed` directive in `spec.go`
 - MCP server runs via stdio (standard input/output)
 - Specification workspace is created in `./specification/`
-- Documentation components are read from `~/.docs/`
+- Documentation components are read from `spec/third/`
 - Symlinks are used for active proposal tracking (`specification/current`)
 
 ## Common Tasks

@@ -1,0 +1,10 @@
+List all proposals with their status and progress.
+
+Displays a table showing:
+    - NAME: The proposal slug
+    - STATUS: active or inactive
+    - PROGRESS: Task completion percentage from implementation.md
+    - DEPENDENCIES: Other proposals this one depends on
+
+Example:
+    nocturnal spec proposal list

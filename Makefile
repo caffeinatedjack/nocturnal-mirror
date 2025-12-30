@@ -17,6 +17,7 @@ test:
 ## install: Install to ~/.local/bin
 install:
 	@go build $(LDFLAGS) -o $(BINARY_NAME) .
+	@rm ~/.local/bin/$(BINARY_NAME)
 	@cp $(BINARY_NAME) ~/.local/bin/
 	@rm $(BINARY_NAME)
 

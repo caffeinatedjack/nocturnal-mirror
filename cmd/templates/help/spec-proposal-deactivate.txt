@@ -1,0 +1,7 @@
+Deactivate the current proposal by removing the specification/current symlink.
+
+This clears the active proposal without removing or completing it.
+The proposal remains in the workspace and can be reactivated later.
+
+Example:
+    nocturnal spec proposal deactivate

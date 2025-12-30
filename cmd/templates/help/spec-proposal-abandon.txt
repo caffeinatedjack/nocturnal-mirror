@@ -1,0 +1,17 @@
+Abandon a proposal without promoting its specification.
+
+Unlike 'complete', this archives all documents but does NOT promote
+the specification to section/. An .abandoned marker file is created
+in the archive to indicate the proposal was not completed.
+
+Actions performed:
+    1. Archive all documents to specification/archive/<change-slug>/
+    2. Create .abandoned marker file in archive
+    3. Remove the proposal workspace
+    4. Clear the active marker if this proposal was active
+
+Use this when a proposal is no longer needed but you want to
+preserve its documents for reference.
+
+Example:
+    nocturnal spec proposal abandon stale-feature
