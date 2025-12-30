@@ -1,6 +1,7 @@
 stages:
   - test
   - build
+  - release
 
 variables:
   BINARY_NAME: nocturnal
@@ -11,8 +12,6 @@ variables:
 test:
   stage: test
   image: golang:1.23
-  rules:
-    - when: manual
   script:
     - go mod download
     - go test -v -race ./...
@@ -23,7 +22,7 @@ build:linux:
   needs:
     - test
   rules:
-    - when: manual
+    - if: $CI_COMMIT_TAG
   script:
     - GOOS=linux GOARCH=amd64 go build -ldflags "${LDFLAGS}" -o ${BINARY_NAME}-linux-amd64 .
   artifacts:
@@ -37,10 +36,31 @@ build:windows:
   needs:
     - test
   rules:
-    - when: manual
+    - if: $CI_COMMIT_TAG
   script:
     - GOOS=windows GOARCH=amd64 go build -ldflags "${LDFLAGS}" -o ${BINARY_NAME}-windows-amd64.exe .
   artifacts:
     paths:
       - ${BINARY_NAME}-windows-amd64.exe
     expire_in: 30 days
+
+release:
+  stage: release
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  needs:
+    - build:linux
+    - build:windows
+  rules:
+    - if: $CI_COMMIT_TAG
+  script:
+    - echo "Creating release for ${CI_COMMIT_TAG}"
+  release:
+    tag_name: $CI_COMMIT_TAG
+    name: "Release $CI_COMMIT_TAG"
+    description: "Release $CI_COMMIT_TAG"
+    assets:
+      links:
+        - name: "${BINARY_NAME}-linux-amd64"
+          url: "${CI_PROJECT_URL}/-/jobs/${CI_JOB_ID}/artifacts/file/${BINARY_NAME}-linux-amd64"
+        - name: "${BINARY_NAME}-windows-amd64.exe"
+          url: "${CI_PROJECT_URL}/-/jobs/${CI_JOB_ID}/artifacts/file/${BINARY_NAME}-windows-amd64.exe"
