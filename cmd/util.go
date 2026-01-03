@@ -51,14 +51,13 @@ func cwdPath(elem ...string) string {
 }
 
 const (
-	specDir        = "spec"
-	ruleDir        = "rule"
-	proposalDir    = "proposal"
-	archiveDir     = "archive"
-	sectionDir     = "section"
-	currentSymlink = "current"
-	projectFile    = "project.md"
-	agentsFile     = "AGENTS.md"
+	specDir     = "spec"
+	ruleDir     = "rule"
+	proposalDir = "proposal"
+	archiveDir  = "archive"
+	sectionDir  = "section"
+	projectFile = "project.md"
+	agentsFile  = "AGENTS.md"
 )
 
 var proposalDocFiles = []string{"specification.md", "design.md", "implementation.md"}
@@ -92,43 +91,22 @@ func printWorkspaceError() {
 	printDim("Run 'nocturnal spec init' first")
 }
 
-// getActiveProposalSlug returns the active proposal name, or empty if none.
+// getActiveProposalSlug returns the primary active proposal name, or empty if none.
+// Deprecated: use getPrimaryProposalSlug from state.go instead.
 func getActiveProposalSlug(specPath string) string {
-	currentPath := filepath.Join(specPath, currentSymlink)
-	target, err := os.Readlink(currentPath)
-	if err != nil {
-		return ""
-	}
-	return filepath.Base(target)
+	return getPrimaryProposalSlug(specPath)
 }
 
-// getActiveProposal returns the active proposal's slug and path.
+// getActiveProposal returns the primary active proposal's slug and path.
+// Deprecated: use getPrimaryProposal from state.go instead.
 func getActiveProposal(specPath string) (slug string, proposalPath string, err error) {
-	currentPath := filepath.Join(specPath, currentSymlink)
-
-	target, err := os.Readlink(currentPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return "", "", nil
-		}
-		return "", "", fmt.Errorf("failed to read current symlink: %w", err)
-	}
-
-	slug = filepath.Base(target)
-	proposalPath = filepath.Join(specPath, proposalDir, slug)
-
-	if !fileExists(proposalPath) {
-		return slug, "", fmt.Errorf("active proposal '%s' no longer exists (stale symlink)", slug)
-	}
-
-	return slug, proposalPath, nil
+	return getPrimaryProposal(specPath)
 }
 
-// clearActiveProposalIfMatches removes the current symlink if it points to slug.
+// clearActiveProposalIfMatches removes a proposal from active state if it matches.
+// Deprecated: use clearProposalIfMatches from state.go instead.
 func clearActiveProposalIfMatches(specPath, slug string) {
-	if getActiveProposalSlug(specPath) == slug {
-		os.Remove(filepath.Join(specPath, currentSymlink))
-	}
+	_ = clearProposalIfMatches(specPath, slug)
 }
 
 // archiveProposalDocs copies proposal documents to the archive directory
@@ -247,36 +225,22 @@ func parseDependsOn(content string) []string {
 	return nil
 }
 
-// findDependentProposals returns a list of proposals that depend on the given slug
-func findDependentProposals(specPath, targetSlug string) ([]string, error) {
-	proposalsPath := filepath.Join(specPath, proposalDir)
-	entries, err := os.ReadDir(proposalsPath)
+// getMissingCompletedDependencies returns dependencies that are not completed.
+// A dependency is considered completed when it exists in spec/section/<dep>.md.
+func getMissingCompletedDependencies(specPath, proposalPath string) ([]string, error) {
+	deps, err := getProposalDependencies(proposalPath)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("failed to read proposals directory: %w", err)
+		return nil, err
 	}
 
-	var dependents []string
-	for _, entry := range entries {
-		if !entry.IsDir() || entry.Name() == targetSlug {
-			continue
-		}
-
-		propPath := filepath.Join(proposalsPath, entry.Name())
-		deps, err := getProposalDependencies(propPath)
-		if err != nil {
-			continue // Skip proposals with unreadable specs
-		}
-
-		for _, dep := range deps {
-			if dep == targetSlug {
-				dependents = append(dependents, entry.Name())
-				break
-			}
+	var missing []string
+	for _, dep := range deps {
+		completedSpecPath := filepath.Join(specPath, sectionDir, dep+".md")
+		if !fileExists(completedSpecPath) {
+			missing = append(missing, dep)
 		}
 	}
 
-	return dependents, nil
+	sort.Strings(missing)
+	return missing, nil
 }

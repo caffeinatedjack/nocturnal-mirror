@@ -15,21 +15,25 @@ Nocturnal uses a structured specification workflow with three document types per
 ## Directory Structure
 
 ```
-specification/
-├── current                      # Symlink to active proposal (if any)
+spec/
+├── .nocturnal.json              # State file (active proposals, hashes)
 ├── project.md                   # Project overview, goals, architecture
 ├── coding guidelines.md         # Code style, testing, error handling conventions
 ├── specification guidelines.md  # How to write specifications
 ├── design guidelines.md         # How to write design documents
-├── rules/                       # Project-wide rules (MUST follow)
+├── rule/                        # Project-wide rules (MUST follow)
 │   └── *.md                     # Individual rule files
-├── proposals/                   # Work in progress
-│   └── <name>/
+├── proposal/                    # Work in progress
+│   └── <slug>/
 │       ├── specification.md     # What to build (requirements)
 │       ├── design.md            # How to build it (architecture)
 │       └── implementation.md    # Progress tracking (tasks)
-└── specs/                       # Completed specifications (read-only reference)
-    └── <name>.md
+├── section/                     # Completed specifications (promoted)
+│   └── <slug>.md
+└── archive/                     # Archived design/implementation for completed/abandoned proposals
+    └── <slug>/
+        ├── design.md
+        └── implementation.md
 ```
 
 ## Working on a Proposal
@@ -46,7 +50,7 @@ Use the nocturnal MCP tools to access specification information:
 
 ## Rules
 - You MUST read the project rules using `nocturnal_rules` and follow them at all times
-- You MUST follow the coding guidelines in `specification/coding guidelines.md`
-- Follow the specification in `specification/current/specification.md`
-- Update `specification/current/implementation.md` as tasks are completed
+- You MUST follow the coding guidelines in `spec/coding guidelines.md`
+- Follow the specification for the active proposal (use `nocturnal_current` to retrieve it)
+- Update the active proposal's `implementation.md` as tasks are completed
 - Mark implementation checkboxes `[x]` when tasks are done

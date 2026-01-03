@@ -1,9 +1,13 @@
 Nocturnal - Agent and specification utilities.
 
 Commands:
-    agent   Agent commands (TODO.md, proposals, project, specs, docs)
-    spec    Manage project specifications
+    spec         Manage project specifications
+    agent        Agent context commands (current, project, specs, summary)
+    docs         Manage third-party documentation in spec/third
+    mcp          Start MCP server exposing agent tools
+    completion   Generate shell completion scripts
 
 Examples:
     nocturnal spec init
     nocturnal spec proposal add my-feature
+    nocturnal docs list

@@ -28,6 +28,8 @@ Development workspaces containing three documents:
 - **design.md** - Technical design decisions and architecture
 - **implementation.md** - Phased implementation plan with tasks
 
+Active proposals are tracked in `spec/.nocturnal.json`. When activated, file hashes are computed to detect modifications - MCP tools will warn agents if proposal files change, requiring user confirmation before proceeding.
+
 ### Rules
 Project-wide constraints and guidelines that persist across all proposals. Rules define coding standards, architectural patterns, or business constraints.
 

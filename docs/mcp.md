@@ -4,11 +4,18 @@ The Model Context Protocol (MCP) server exposes Nocturnal's agent tools to AI as
 
 ## Overview
 
-The MCP server runs via standard input/output (stdio), making it easy to integrate with AI assistant configurations. It provides five tools and one prompt for accessing project context.
+The MCP server runs via standard input/output (stdio), making it easy to integrate with AI assistant configurations. It provides three tools and two prompts for accessing project context.
 
-**What it does:**
+**Tools:**
 
-Exposes a few helper tools and prompt to make integrating with nocturnal easier.
+- `context` - Rules/project design + active proposal docs + open tasks (single, correctness-oriented context payload)
+- `docs_list` - List available documentation components
+- `docs_search` - Search documentation components by name
+
+**Prompts:**
+
+- `start-implementation` - Bootstrap instructions for implementing using Nocturnal context
+- `add-third-party-docs` - Generate condensed documentation for third-party libraries
 
 ## Configuration
 

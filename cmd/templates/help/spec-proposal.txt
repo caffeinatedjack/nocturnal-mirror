@@ -5,5 +5,8 @@ Commands:
     remove      Remove a proposal
     activate    Activate a proposal
     deactivate  Deactivate the current proposal
+    current     Show the currently active proposal(s)
     complete    Complete and promote a proposal
     validate    Validate proposal against guidelines
+    list        List all proposals with status
+    abandon     Abandon a proposal (archive without promoting)

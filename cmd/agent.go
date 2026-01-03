@@ -13,6 +13,4 @@ func init() {
 	agentCmd.Long = helpText("agent")
 
 	rootCmd.AddCommand(agentCmd)
-
-	RegisterDocsCommand(agentCmd)
 }

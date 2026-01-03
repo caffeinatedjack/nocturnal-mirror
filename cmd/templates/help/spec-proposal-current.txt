@@ -1,0 +1,8 @@
+Show the currently active proposal(s).
+
+Displays all active proposals with their status and progress. The primary
+proposal is highlighted. If files have been modified since activation,
+a warning is shown.
+
+Example:
+    nocturnal spec proposal current

@@ -28,6 +28,9 @@ func init() {
 
 	docsCmd.AddCommand(docsListCmd)
 	docsCmd.AddCommand(docsSearchCmd)
+
+	// Docs is a top-level command.
+	RegisterDocsCommand(rootCmd)
 }
 
 // RegisterDocsCommand adds the docs subcommand to a parent command.

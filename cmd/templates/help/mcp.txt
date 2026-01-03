@@ -4,11 +4,13 @@ This allows AI assistants and other MCP clients to interact with nocturnal's
 agent functionality programmatically.
 
 Exposed tools:
-    rules           Get project rules and design context
-    current         Show active proposal (specification and design only)
-    tasks           Get implementation tasks for active proposal
+    context         Get project context for implementing the active proposal
     docs_list       List available library and API documentation
     docs_search     Search library and API documentation by name
+
+Exposed prompts:
+    start-implementation  Start an implementation using Nocturnal context
+    add-third-party-docs  Generate condensed documentation for third-party libraries
 
 Example:
     nocturnal mcp

@@ -137,10 +137,10 @@ var specProposalAbandonCmd = &cobra.Command{
 	ValidArgsFunction: completeProposalNames,
 }
 
-var agentSummaryCmd = &cobra.Command{
-	Use:   "summary",
-	Short: "Show a complete project summary for AI context",
-	Run:   runAgentSummary,
+var specProposalCurrentCmd = &cobra.Command{
+	Use:   "current",
+	Short: "Show the currently active proposal(s)",
+	Run:   runSpecProposalCurrent,
 }
 
 var specRuleCmd = &cobra.Command{
@@ -193,13 +193,13 @@ func init() {
 	specProposalValidateCmd.Long = helpText("spec-proposal-validate")
 	specProposalListCmd.Long = helpText("spec-proposal-list")
 	specProposalAbandonCmd.Long = helpText("spec-proposal-abandon")
+	specProposalCurrentCmd.Long = helpText("spec-proposal-current")
 	specRuleCmd.Long = helpText("spec-rule")
 	specRuleAddCmd.Long = helpText("spec-rule-add")
 	specRuleShowCmd.Long = helpText("spec-rule-show")
 	agentCurrentCmd.Long = helpText("agent-current")
 	agentProjectCmd.Long = helpText("agent-project")
 	agentSpecificationsCmd.Long = helpText("agent-specs")
-	agentSummaryCmd.Long = helpText("agent-summary")
 
 	rootCmd.AddCommand(specCmd)
 
@@ -216,6 +216,7 @@ func init() {
 	specProposalCmd.AddCommand(specProposalValidateCmd)
 	specProposalCmd.AddCommand(specProposalListCmd)
 	specProposalCmd.AddCommand(specProposalAbandonCmd)
+	specProposalCmd.AddCommand(specProposalCurrentCmd)
 
 	specProposalRemoveCmd.Flags().BoolVarP(&forceRemove, "force", "f", false, "Force removal even if proposal is active")
 
@@ -225,7 +226,6 @@ func init() {
 	agentCmd.AddCommand(agentCurrentCmd)
 	agentCmd.AddCommand(agentProjectCmd)
 	agentCmd.AddCommand(agentSpecificationsCmd)
-	agentCmd.AddCommand(agentSummaryCmd)
 }
 
 var proposalDocs = []struct {
@@ -654,17 +654,17 @@ func runSpecProposalRemove(cmd *cobra.Command, args []string) {
 		printError(err.Error())
 		return
 	}
-	currentPath := filepath.Join(specPath, currentSymlink)
 
-	if !forceRemove {
-		if target, err := os.Readlink(currentPath); err == nil {
-			activeSlug := filepath.Base(target)
-			if activeSlug == slug {
-				printError(fmt.Sprintf("Proposal '%s' is currently active", slug))
-				printDim("Use --force to remove anyway, or deactivate first")
-				return
-			}
-		}
+	state, err := loadState(specPath)
+	if err != nil {
+		printError(fmt.Sprintf("Failed to load state: %v", err))
+		return
+	}
+
+	if !forceRemove && state.isProposalActive(slug) {
+		printError(fmt.Sprintf("Proposal '%s' is currently active", slug))
+		printDim("Use --force to remove anyway, or deactivate first")
+		return
 	}
 
 	if err := os.RemoveAll(proposalPath); err != nil {
@@ -672,7 +672,13 @@ func runSpecProposalRemove(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	clearActiveProposalIfMatches(specPath, slug)
+	if state.isProposalActive(slug) {
+		state.deactivateProposal(slug)
+		if err := saveState(specPath, state); err != nil {
+			printWarning(fmt.Sprintf("Failed to update state: %v", err))
+		}
+	}
+
 	printSuccess(fmt.Sprintf("Removed proposal '%s'", slug))
 }
 
@@ -684,35 +690,43 @@ func runSpecProposalActivate(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	if _, err := checkProposal(specPath, slug); err != nil {
+	proposalPath, err := checkProposal(specPath, slug)
+	if err != nil {
 		printError(err.Error())
 		return
 	}
-	currentPath := filepath.Join(specPath, currentSymlink)
 
-	// Check if any other proposals depend on this one
-	dependents, err := findDependentProposals(specPath, slug)
+	// Check that this proposal's dependencies are completed.
+	missing, err := getMissingCompletedDependencies(specPath, proposalPath)
 	if err != nil {
 		printError(fmt.Sprintf("Failed to check dependencies: %v", err))
 		return
 	}
-	if len(dependents) > 0 {
-		printError(fmt.Sprintf("Cannot activate '%s': other proposals depend on it", slug))
-		printDim(fmt.Sprintf("Dependent proposals: %s", strings.Join(dependents, ", ")))
-		printDim("Complete the dependent proposals first, or remove the dependency")
+	if len(missing) > 0 {
+		printError(fmt.Sprintf("Cannot activate '%s': missing completed dependencies", slug))
+		printDim(fmt.Sprintf("Missing: %s", strings.Join(missing, ", ")))
+		printDim("Complete the dependencies first (they must exist in spec/section/)")
 		return
 	}
 
-	if _, err := os.Lstat(currentPath); err == nil {
-		if err := os.Remove(currentPath); err != nil {
-			printError(fmt.Sprintf("Failed to remove existing symlink: %v", err))
-			return
-		}
+	// Compute hashes for proposal files
+	hashes, err := computeProposalHashes(proposalPath)
+	if err != nil {
+		printError(fmt.Sprintf("Failed to compute file hashes: %v", err))
+		return
 	}
 
-	relTarget := filepath.Join(proposalDir, slug)
-	if err := os.Symlink(relTarget, currentPath); err != nil {
-		printError(fmt.Sprintf("Failed to create symlink: %v", err))
+	// Load state and activate proposal
+	state, err := loadState(specPath)
+	if err != nil {
+		printError(fmt.Sprintf("Failed to load state: %v", err))
+		return
+	}
+
+	state.activateProposal(slug, hashes)
+
+	if err := saveState(specPath, state); err != nil {
+		printError(fmt.Sprintf("Failed to save state: %v", err))
 		return
 	}
 
@@ -726,24 +740,80 @@ func runSpecProposalDeactivate(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	currentPath := filepath.Join(specPath, currentSymlink)
-
-	slug, _, err := getActiveProposal(specPath)
+	state, err := loadState(specPath)
 	if err != nil {
-		printWarning(err.Error())
+		printError(fmt.Sprintf("Failed to load state: %v", err))
 		return
 	}
-	if slug == "" {
+
+	if state.Primary == "" {
 		printDim("No active proposal to deactivate")
 		return
 	}
 
-	if err := os.Remove(currentPath); err != nil {
-		printError(fmt.Sprintf("Failed to remove symlink: %v", err))
+	slug := state.Primary
+	state.deactivateProposal(slug)
+
+	if err := saveState(specPath, state); err != nil {
+		printError(fmt.Sprintf("Failed to save state: %v", err))
 		return
 	}
 
 	printSuccess(fmt.Sprintf("Deactivated proposal '%s'", slug))
+}
+
+func runSpecProposalCurrent(cmd *cobra.Command, args []string) {
+	specPath, err := checkSpecWorkspace()
+	if err != nil {
+		printWorkspaceError()
+		return
+	}
+
+	state, err := loadState(specPath)
+	if err != nil {
+		printError(fmt.Sprintf("Failed to load state: %v", err))
+		return
+	}
+
+	if len(state.Active) == 0 {
+		printDim("No active proposals")
+		return
+	}
+
+	fmt.Println()
+	fmt.Println(boldStyle.Render("Active Proposals"))
+	fmt.Println()
+
+	for _, slug := range state.Active {
+		proposalPath := filepath.Join(specPath, proposalDir, slug)
+		total, completed := getProposalProgress(proposalPath)
+
+		var status string
+		if slug == state.Primary {
+			status = successStyle.Render("primary")
+		} else {
+			status = dimStyle.Render("active")
+		}
+
+		var progress string
+		if total > 0 {
+			percentage := (completed * 100) / total
+			progressBar := renderProgressBar(completed, total, 20)
+			progress = fmt.Sprintf("%s %s", progressBar, dimStyle.Render(fmt.Sprintf("%d%% (%d/%d)", percentage, completed, total)))
+		} else {
+			progress = dimStyle.Render("(no tasks)")
+		}
+
+		// Check integrity
+		changed, _, _ := checkProposalIntegrity(specPath, slug)
+		var integrityNote string
+		if len(changed) > 0 {
+			integrityNote = warningStyle.Render(fmt.Sprintf(" [modified: %s]", strings.Join(changed, ", ")))
+		}
+
+		fmt.Printf("  %s  %s  %s%s\n", infoStyle.Render(slug), status, progress, integrityNote)
+	}
+	fmt.Println()
 }
 
 func runSpecProposalComplete(cmd *cobra.Command, args []string) {
@@ -1311,57 +1381,4 @@ func runSpecProposalAbandon(cmd *cobra.Command, args []string) {
 	clearActiveProposalIfMatches(specPath, slug)
 	printSuccess(fmt.Sprintf("Abandoned proposal '%s'", slug))
 	printDim(fmt.Sprintf("Archived to %s/%s/", archiveDir, slug))
-}
-
-// buildProjectSummary creates a complete project summary including rules, specs, and active proposal
-func buildProjectSummary(specPath string) string {
-	var buf bytes.Buffer
-
-	// Project rules and design
-	rulesContent, err := readRulesAndProject(specPath)
-	if err == nil && rulesContent != "" {
-		buf.WriteString(rulesContent)
-	}
-
-	// Completed specifications
-	specsContent, err := readSpecifications(specPath)
-	if err == nil && specsContent != "" {
-		if buf.Len() > 0 {
-			buf.WriteString("\n---\n\n")
-		}
-		buf.WriteString(specsContent)
-	}
-
-	// Active proposal
-	slug, proposalPath, err := getActiveProposal(specPath)
-	if err == nil && slug != "" {
-		if buf.Len() > 0 {
-			buf.WriteString("\n---\n\n")
-		}
-		buf.WriteString(fmt.Sprintf("# Active Proposal: %s\n\n", slug))
-
-		proposalContent, err := readProposalDocs(proposalPath)
-		if err == nil && proposalContent != "" {
-			buf.WriteString(proposalContent)
-		}
-	}
-
-	return buf.String()
-}
-
-func runAgentSummary(cmd *cobra.Command, args []string) {
-	specPath, err := checkSpecWorkspace()
-	if err != nil {
-		printWorkspaceError()
-		return
-	}
-
-	summary := buildProjectSummary(specPath)
-	if summary == "" {
-		printDim("No project context found")
-		printDim("Add rules, project.md, specifications, or activate a proposal")
-		return
-	}
-
-	fmt.Print(summary)
 }

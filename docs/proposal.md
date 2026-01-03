@@ -129,20 +129,20 @@ nocturnal spec proposal activate <change-slug>
 - `<change-slug>` - Name of the proposal to activate
 
 **What it does:**
-- Creates/updates `spec/current` symlink to point to the proposal
-- Removes any existing symlink to a different proposal
-- Validates that no other proposals depend on this one
-- Makes the proposal the default for agent commands
+- Updates the state file (`spec/.nocturnal.json`) to mark proposal as active
+- Sets the proposal as the primary (default) active proposal
+- Computes and stores file hashes for integrity checking
+- Validates that the proposal's dependencies are completed
 
 **Dependency check:**
-- Prevents activating a proposal if other proposals depend on it
-- Shows list of dependent proposals
-- Ensures logical development order
+- Reads `**Depends on**:` from the proposal's `specification.md`
+- Prevents activation until each dependency exists as a completed spec in `spec/section/<dep>.md`
+- Ensures logical development order (dependencies first)
 
-**Why symlinks:**
-- Provides a stable path for tools/agents to access current work
-- Allows quick switching between proposals
-- Shell-friendly for `cd spec/current`
+**File integrity:**
+- On activation, SHA256 hashes are computed for all proposal documents
+- MCP tools verify these hashes before returning content
+- If files have been modified, agents are warned and must request user confirmation
 
 **Example:**
 ```bash
@@ -156,7 +156,7 @@ Activated proposal 'user-authentication'
 
 **Error cases:**
 - Proposal doesn't exist
-- Other proposals depend on it (must complete dependents first)
+- One or more dependencies are not completed (missing from `spec/section/`)
 
 ---
 
@@ -236,7 +236,7 @@ nocturnal spec proposal complete <change-slug>
 3. Copies `design.md` and `implementation.md` to archive
 4. Copies `specification.md` to `spec/section/<slug>.md`
 5. Removes the proposal directory
-6. Clears the `current` symlink if this was the active proposal
+6. Updates state file to remove the proposal from active list
 
 **Archive structure:**
 ```
@@ -288,7 +288,7 @@ nocturnal spec proposal remove <change-slug> --force
 **What it does:**
 - Deletes the proposal directory and all its documents
 - Checks if proposal is active (prevents accidental deletion)
-- Removes `current` symlink if this was the active proposal
+- Updates state file to remove the proposal from active list
 
 **Safety features:**
 - Requires `--force` flag if proposal is active

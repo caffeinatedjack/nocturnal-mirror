@@ -14,7 +14,6 @@ go run . <command>            # Run without building
 # Testing & Quality
 make test                     # Run all tests with race detection
 go test -v ./...              # Run all tests
-go test -v ./pkg/ui           # Run tests for specific package
 go test -v -run TestName ./.. # Run a single test by name
 
 # Code Quality
@@ -30,15 +29,13 @@ nocturnal/
 ├── main.go              # Entry point, sets version/build vars
 ├── cmd/                 # CLI commands (Cobra-based)
 │   ├── root.go          # Root command and completion
-│   ├── agent.go         # Agent subcommands (todoread/todowrite)
-│   ├── docs.go          # Documentation management
+│   ├── agent.go         # Agent context commands
+│   ├── docs.go          # Third-party documentation management
 │   ├── mcp.go           # MCP server implementation
 │   ├── spec.go          # Specification management commands
-│   └── templates/       # Embedded templates for spec init
-├── pkg/
-│   └── ui/
-│       └── format.go    # Terminal UI formatting (lipgloss)
-└── specification/       # Project's own spec workspace
+│   └── templates/       # Embedded templates and help text
+├── docs/                # Project documentation (for this repo)
+└── spec/                # Workspace (created per-project via `nocturnal spec init`)
 ```
 
 ## Code Style Guidelines
@@ -56,8 +53,6 @@ import (
     "os"
 
     "github.com/spf13/cobra"
-
-    "gitlab.com/caffeinatedjack/nocturnal/pkg/ui"
 )
 ```
 
@@ -75,9 +70,9 @@ import (
 | Files        | lowercase, underscores ok      | `format.go`, `agent.go`      |
 | Functions    | PascalCase (exported)          | `Execute()`, `Success()`     |
 | Functions    | camelCase (unexported)         | `runTodoWrite()`, `copyFile` |
-| Variables    | camelCase                      | `specPath`, `todoList`       |
+| Variables    | camelCase                      | `specPath`, `proposalPath`   |
 | Constants    | camelCase (unexported)         | `specDir`, `ruleDir`         |
-| Structs      | PascalCase                     | `TodoItem`, `DocComponent`   |
+| Structs      | PascalCase                     | `DocComponent`               |
 | Interfaces   | PascalCase, -er suffix if verb | `Reader`, `Formatter`        |
 
 ### Error Handling
@@ -143,14 +138,14 @@ Examples:
 
 ### UI Output
 
-Use the `pkg/ui` package for consistent terminal output:
+Use the cmd package's output helpers for consistent terminal output:
 
 ```go
-ui.Success("Operation completed")    // Green text
-ui.Error("Something went wrong")     // Red text
-ui.Warning("Be careful")             // Yellow text
-ui.Info("FYI")                       // Blue text
-ui.PrintDim("Secondary info")        // Dimmed text
+printSuccess("Operation completed")
+printError("Something went wrong")
+printWarning("Be careful")
+printInfo("FYI")
+printDim("Secondary info")
 ```
 
 ## Working with Nocturnal Specifications
@@ -160,7 +155,6 @@ This project uses its own specification management. When working on proposals:
 1. Read project rules: `nocturnal agent project`
 2. Check active proposal: `nocturnal agent current`
 3. View completed specs: `nocturnal agent specs`
-4. Manage TODO list: `nocturnal agent todoread` / `todowrite`
 
 ### Proposal Workflow
 
@@ -188,9 +182,9 @@ nocturnal spec proposal complete my-feature # Archive and promote
 
 - Templates are embedded using `//go:embed` directive in `spec.go`
 - MCP server runs via stdio (standard input/output)
-- Specification workspace is created in `./specification/`
+- Specification workspace is created in `./spec/`
 - Documentation components are read from `spec/third/`
-- Symlinks are used for active proposal tracking (`specification/current`)
+- Active proposal state is stored in `spec/.nocturnal.json`
 
 ## Common Tasks
 

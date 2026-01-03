@@ -1,14 +1,11 @@
-Agent commands for managing the active proposal context and accessing documentation.
+Agent commands for managing the active proposal context.
 
 Commands:
     current         Show the currently active proposal
     project         Show project rules and design
     specifications  Show completed specifications (alias: specs)
-    docs            Search/list components in spec/third
 
 Examples:
     nocturnal agent current
     nocturnal agent project
     nocturnal agent specs
-    nocturnal agent docs list
-    nocturnal agent docs search "component"
