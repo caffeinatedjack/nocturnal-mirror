@@ -1,0 +1,11 @@
+Set a configuration value.
+
+Available configuration keys:
+  validation.strict              Treat validation warnings as errors (true/false)
+  context.include_affected_files Include code from affected files in MCP context (true/false)
+  context.max_file_lines         Maximum lines to include per affected file (number)
+
+Examples:
+    nocturnal spec config set validation.strict true
+    nocturnal spec config set context.include_affected_files true
+    nocturnal spec config set context.max_file_lines 100

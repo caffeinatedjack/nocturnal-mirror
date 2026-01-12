@@ -1,0 +1,12 @@
+Show project statistics and metrics.
+
+Displays aggregated information about specifications, proposals,
+and current progress including:
+
+  - Completed specifications count
+  - Requirements breakdown (MUST/SHOULD/MAY)
+  - Active, pending, and archived proposals
+  - Current proposal task progress
+
+Examples:
+    nocturnal spec stats

@@ -161,6 +161,30 @@ var specRuleShowCmd = &cobra.Command{
 	Run:   runSpecRuleShow,
 }
 
+var specConfigCmd = &cobra.Command{
+	Use:   "config",
+	Short: "Manage project configuration",
+}
+
+var specConfigShowCmd = &cobra.Command{
+	Use:   "show",
+	Short: "Show current configuration",
+	Run:   runSpecConfigShow,
+}
+
+var specConfigInitCmd = &cobra.Command{
+	Use:   "init",
+	Short: "Create default configuration file",
+	Run:   runSpecConfigInit,
+}
+
+var specConfigSetCmd = &cobra.Command{
+	Use:   "set <key> <value>",
+	Short: "Set a configuration value",
+	Args:  cobra.ExactArgs(2),
+	Run:   runSpecConfigSet,
+}
+
 var agentCurrentCmd = &cobra.Command{
 	Use:   "current",
 	Short: "Show the currently active proposal",
@@ -197,6 +221,10 @@ func init() {
 	specRuleCmd.Long = helpText("spec-rule")
 	specRuleAddCmd.Long = helpText("spec-rule-add")
 	specRuleShowCmd.Long = helpText("spec-rule-show")
+	specConfigCmd.Long = helpText("spec-config")
+	specConfigShowCmd.Long = helpText("spec-config-show")
+	specConfigInitCmd.Long = helpText("spec-config-init")
+	specConfigSetCmd.Long = helpText("spec-config-set")
 	agentCurrentCmd.Long = helpText("agent-current")
 	agentProjectCmd.Long = helpText("agent-project")
 	agentSpecificationsCmd.Long = helpText("agent-specs")
@@ -207,6 +235,11 @@ func init() {
 	specCmd.AddCommand(specInitCmd)
 	specCmd.AddCommand(specProposalCmd)
 	specCmd.AddCommand(specRuleCmd)
+	specCmd.AddCommand(specConfigCmd)
+
+	specConfigCmd.AddCommand(specConfigShowCmd)
+	specConfigCmd.AddCommand(specConfigInitCmd)
+	specConfigCmd.AddCommand(specConfigSetCmd)
 
 	specProposalCmd.AddCommand(specProposalAddCmd)
 	specProposalCmd.AddCommand(specProposalRemoveCmd)
@@ -586,6 +619,12 @@ func runSpecInit(cmd *cobra.Command, args []string) {
 			printError(fmt.Sprintf("Failed to create %s: %v", tf.filename, err))
 			return
 		}
+	}
+
+	// Create default configuration file
+	config := DefaultConfig()
+	if err := saveConfig(specPath, config); err != nil {
+		printWarning(fmt.Sprintf("Failed to create config file: %v", err))
 	}
 
 	printSuccess("Initialized specification workspace")
@@ -1381,4 +1420,110 @@ func runSpecProposalAbandon(cmd *cobra.Command, args []string) {
 	clearActiveProposalIfMatches(specPath, slug)
 	printSuccess(fmt.Sprintf("Abandoned proposal '%s'", slug))
 	printDim(fmt.Sprintf("Archived to %s/%s/", archiveDir, slug))
+}
+
+func runSpecConfigShow(cmd *cobra.Command, args []string) {
+	specPath, err := checkSpecWorkspace()
+	if err != nil {
+		printWorkspaceError()
+		return
+	}
+
+	config, err := loadConfig(specPath)
+	if err != nil {
+		printError(fmt.Sprintf("Failed to load config: %v", err))
+		return
+	}
+
+	fmt.Println()
+	fmt.Println(boldStyle.Render("Configuration"))
+	fmt.Println()
+
+	configPath := getConfigPath(specPath)
+	if fileExists(configPath) {
+		printDim(fmt.Sprintf("Source: %s", configPath))
+	} else {
+		printDim("Source: defaults (no config file)")
+	}
+	fmt.Println()
+
+	fmt.Println(boldStyle.Render("Validation"))
+	fmt.Printf("  strict: %v\n", config.Validation.Strict)
+	if len(config.Validation.RequireSections) > 0 {
+		fmt.Printf("  require_sections: %v\n", config.Validation.RequireSections)
+	} else {
+		fmt.Printf("  require_sections: %s\n", dimStyle.Render("(none)"))
+	}
+	fmt.Println()
+
+	fmt.Println(boldStyle.Render("Context"))
+	fmt.Printf("  include_affected_files: %v\n", config.Context.IncludeAffectedFiles)
+	fmt.Printf("  max_file_lines: %d\n", config.Context.MaxFileLines)
+	fmt.Println()
+}
+
+func runSpecConfigInit(cmd *cobra.Command, args []string) {
+	specPath, err := checkSpecWorkspace()
+	if err != nil {
+		printWorkspaceError()
+		return
+	}
+
+	configPath := getConfigPath(specPath)
+	if fileExists(configPath) {
+		printWarning("Configuration file already exists")
+		printDim(fmt.Sprintf("Location: %s", configPath))
+		return
+	}
+
+	config := DefaultConfig()
+	if err := saveConfig(specPath, config); err != nil {
+		printError(fmt.Sprintf("Failed to create config: %v", err))
+		return
+	}
+
+	printSuccess("Created configuration file")
+	printDim(fmt.Sprintf("Location: %s", configPath))
+}
+
+func runSpecConfigSet(cmd *cobra.Command, args []string) {
+	specPath, err := checkSpecWorkspace()
+	if err != nil {
+		printWorkspaceError()
+		return
+	}
+
+	key := args[0]
+	value := args[1]
+
+	config, err := loadConfig(specPath)
+	if err != nil {
+		printError(fmt.Sprintf("Failed to load config: %v", err))
+		return
+	}
+
+	switch key {
+	case "validation.strict":
+		config.Validation.Strict = value == "true"
+	case "context.include_affected_files":
+		config.Context.IncludeAffectedFiles = value == "true"
+	case "context.max_file_lines":
+		var lines int
+		if _, err := fmt.Sscanf(value, "%d", &lines); err != nil {
+			printError("Invalid value: must be a number")
+			return
+		}
+		config.Context.MaxFileLines = lines
+	default:
+		printError(fmt.Sprintf("Unknown config key: %s", key))
+		printDim("Valid keys: validation.strict, context.include_affected_files, context.max_file_lines")
+		return
+	}
+
+	if err := saveConfig(specPath, config); err != nil {
+		printError(fmt.Sprintf("Failed to save config: %v", err))
+		return
+	}
+
+	printSuccess(fmt.Sprintf("Set %s = %s", key, value))
 }

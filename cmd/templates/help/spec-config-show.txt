@@ -1,0 +1,7 @@
+Show current configuration values.
+
+Displays all configuration settings and their current values,
+along with the source (config file or defaults).
+
+Examples:
+    nocturnal spec config show

@@ -133,6 +133,18 @@ func registerContextTool(s *server.MCPServer) {
 			sections = append(sections, tasksHeader+strings.Join(openTasks, "\n"))
 		}
 
+		// Include affected files if configured
+		config := loadConfigOrDefault(specPath)
+		if config.Context.IncludeAffectedFiles {
+			affectedFiles, err := getAffectedFiles(proposalPath)
+			if err == nil && len(affectedFiles) > 0 {
+				affectedSection := buildAffectedFilesSection(affectedFiles, config.Context.MaxFileLines)
+				if affectedSection != "" {
+					sections = append(sections, affectedSection)
+				}
+			}
+		}
+
 		return mcp.NewToolResultText(strings.Join(sections, "\n\n---\n\n")), nil
 	})
 }
@@ -146,6 +158,79 @@ func extractOpenTasks(content string) []string {
 		}
 	}
 	return tasks
+}
+
+// buildAffectedFilesSection creates a section with affected file contents.
+func buildAffectedFilesSection(files []string, maxLines int) string {
+	var buf strings.Builder
+	buf.WriteString("# Affected Files\n\n")
+
+	foundAny := false
+	for _, filePath := range files {
+		// Try to read the file
+		content, truncated, err := readAffectedFileContent(filePath, maxLines)
+		if err != nil {
+			if os.IsNotExist(err) {
+				buf.WriteString(fmt.Sprintf("## %s\n\n(file not found)\n\n", filePath))
+			} else {
+				buf.WriteString(fmt.Sprintf("## %s\n\n(error reading: %v)\n\n", filePath, err))
+			}
+			continue
+		}
+
+		foundAny = true
+		buf.WriteString(fmt.Sprintf("## %s\n\n", filePath))
+
+		// Determine language for code fence
+		ext := filepath.Ext(filePath)
+		lang := ""
+		switch ext {
+		case ".go":
+			lang = "go"
+		case ".js":
+			lang = "javascript"
+		case ".ts":
+			lang = "typescript"
+		case ".py":
+			lang = "python"
+		case ".rs":
+			lang = "rust"
+		case ".rb":
+			lang = "ruby"
+		case ".java":
+			lang = "java"
+		case ".c", ".h":
+			lang = "c"
+		case ".cpp", ".hpp", ".cc":
+			lang = "cpp"
+		case ".md":
+			lang = "markdown"
+		case ".yaml", ".yml":
+			lang = "yaml"
+		case ".json":
+			lang = "json"
+		case ".sh", ".bash":
+			lang = "bash"
+		}
+
+		buf.WriteString(fmt.Sprintf("```%s\n", lang))
+		buf.WriteString(content)
+		if !strings.HasSuffix(content, "\n") {
+			buf.WriteString("\n")
+		}
+		buf.WriteString("```\n")
+
+		if truncated {
+			buf.WriteString(fmt.Sprintf("\n(truncated to %d lines)\n", maxLines))
+		}
+		buf.WriteString("\n")
+	}
+
+	if !foundAny {
+		return ""
+	}
+
+	return buf.String()
 }
 
 func registerDocsListTool(s *server.MCPServer) {

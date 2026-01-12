@@ -1,6 +1,7 @@
 # {{.Name}}
 
 **Depends on**: <!-- comma-separated list of proposal slugs this depends on, or "none" -->
+**Affected files**: <!-- comma-separated list of files/paths this proposal affects, e.g., cmd/spec.go, internal/util.go -->
 
 ## Abstract
 

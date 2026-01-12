@@ -244,3 +244,70 @@ func getMissingCompletedDependencies(specPath, proposalPath string) ([]string, e
 	sort.Strings(missing)
 	return missing, nil
 }
+
+// getAffectedFiles reads the specification.md file and extracts the "Affected files" field
+func getAffectedFiles(proposalPath string) ([]string, error) {
+	specPath := filepath.Join(proposalPath, "specification.md")
+	content, err := os.ReadFile(specPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to read specification.md: %w", err)
+	}
+
+	return parseAffectedFiles(string(content)), nil
+}
+
+// parseAffectedFiles extracts file paths from the "**Affected files**:" field in content
+func parseAffectedFiles(content string) []string {
+	lines := strings.Split(content, "\n")
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		// Match "**Affected files**:" or "Affected files:" (case-insensitive)
+		lower := strings.ToLower(trimmed)
+		if strings.HasPrefix(lower, "**affected files**:") || strings.HasPrefix(lower, "affected files:") {
+			// Extract the value after the colon
+			idx := strings.Index(trimmed, ":")
+			if idx == -1 {
+				continue
+			}
+			value := strings.TrimSpace(trimmed[idx+1:])
+			// Remove any trailing comments
+			if commentIdx := strings.Index(value, "<!--"); commentIdx != -1 {
+				value = strings.TrimSpace(value[:commentIdx])
+			}
+			// Skip if empty or still contains template placeholder
+			if value == "" || strings.Contains(value, "<!--") {
+				return nil
+			}
+			// Parse comma-separated list
+			var files []string
+			for _, file := range strings.Split(value, ",") {
+				file = strings.TrimSpace(file)
+				if file != "" {
+					files = append(files, file)
+				}
+			}
+			return files
+		}
+	}
+	return nil
+}
+
+// readAffectedFileContent reads the content of an affected file, limited by maxLines.
+// Returns the content and whether it was truncated.
+func readAffectedFileContent(filePath string, maxLines int) (string, bool, error) {
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		return "", false, err
+	}
+
+	lines := strings.Split(string(content), "\n")
+	if len(lines) <= maxLines {
+		return string(content), false, nil
+	}
+
+	truncated := strings.Join(lines[:maxLines], "\n")
+	return truncated, true, nil
+}

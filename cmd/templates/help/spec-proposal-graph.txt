@@ -1,0 +1,17 @@
+Show proposal dependency graph.
+
+Visualizes dependencies between proposals, showing which proposals
+depend on others and which are blocked. Completed specifications
+are shown as satisfied dependencies.
+
+Output formats:
+  ascii  Terminal-friendly tree view (default)
+  dot    Graphviz DOT format for rendering with 'dot' command
+
+The graph will warn about circular dependencies if detected.
+
+Examples:
+    nocturnal spec proposal graph              # Show all proposals
+    nocturnal spec proposal graph my-feature   # Show specific proposal and its dependencies
+    nocturnal spec proposal graph -f dot       # Output DOT format
+    nocturnal spec proposal graph -f dot | dot -Tpng -o graph.png  # Render to PNG

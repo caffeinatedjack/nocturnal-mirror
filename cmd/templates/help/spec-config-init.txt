@@ -1,0 +1,8 @@
+Create a default configuration file.
+
+Creates spec/nocturnal.yaml with default settings. This file is
+automatically created during 'spec init', but you can use this
+command to create it in an existing workspace.
+
+Examples:
+    nocturnal spec config init

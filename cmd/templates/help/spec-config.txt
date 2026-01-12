@@ -1,0 +1,14 @@
+Manage project-level configuration for nocturnal.
+
+Configuration is stored in spec/nocturnal.yaml and controls validation
+behavior and MCP context settings.
+
+Available subcommands:
+  show    Show current configuration
+  init    Create default configuration file
+  set     Set a configuration value
+
+Examples:
+    nocturnal spec config show
+    nocturnal spec config init
+    nocturnal spec config set validation.strict true
