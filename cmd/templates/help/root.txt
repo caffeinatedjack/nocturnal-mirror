@@ -2,7 +2,7 @@ Nocturnal - Agent and specification utilities.
 
 Commands:
     spec         Manage project specifications
-    agent        Agent context commands (current, project, specs, summary)
+    agent        Agent context commands (current, project, specs)
     docs         Manage third-party documentation in spec/third
     mcp          Start MCP server exposing agent tools
     completion   Generate shell completion scripts
@@ -10,4 +10,4 @@ Commands:
 Examples:
     nocturnal spec init
     nocturnal spec proposal add my-feature
-    nocturnal docs list
+    nocturnal mcp

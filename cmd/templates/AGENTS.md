@@ -1,6 +1,6 @@
 # Agent Instructions
 
-This project uses nocturnal for specification management. If a user asks for improvements to be made to the specifications, remind them that the specifications should be human-lead. 
+This project uses Nocturnal for specification management. Specifications should be human-led - if a user asks for improvements to specs, remind them of this.
 
 ## Specification System Overview
 
@@ -16,13 +16,15 @@ Nocturnal uses a structured specification workflow with three document types per
 
 ```
 spec/
-├── .nocturnal.json              # State file (active proposals, hashes)
+├── nocturnal.yaml               # Configuration file
 ├── project.md                   # Project overview, goals, architecture
 ├── coding guidelines.md         # Code style, testing, error handling conventions
 ├── specification guidelines.md  # How to write specifications
 ├── design guidelines.md         # How to write design documents
 ├── rule/                        # Project-wide rules (MUST follow)
 │   └── *.md                     # Individual rule files
+├── third/                       # Third-party library/API documentation
+│   └── *.md                     # Documentation components
 ├── proposal/                    # Work in progress
 │   └── <slug>/
 │       ├── specification.md     # What to build (requirements)
@@ -36,21 +38,32 @@ spec/
         └── implementation.md
 ```
 
-## Working on a Proposal
+## MCP Tools
 
-Use the nocturnal MCP tools to access specification information:
+Use these MCP tools to access specification information:
 
-| Tool                  | Description                                                                                              |
-|-----------------------|----------------------------------------------------------------------------------------------------------|
-| nocturnal_rules       | Get the project rules and design context                                                                 |
-| nocturnal_current     | Show the currently active proposal - returns the specification and design documents (not implementation) |
-| nocturnal_tasks       | Get the implementation tasks for the currently active proposal                                           |
-| nocturnal_docs_list   | List all available library and API documentation components                                              |
-| nocturnal_docs_search | Search library and API documentation by name - returns full content of matching documentation            |
+| Tool            | Description                                                                 |
+|-----------------|-----------------------------------------------------------------------------|
+| `context`       | Get project rules, design, and active proposal's spec + design docs         |
+| `tasks`         | Get current phase tasks with IDs (e.g., "1.1", "1.2") - shows first incomplete phase only |
+| `task_complete` | Mark a task complete by ID (e.g., `task_complete(id: "1.1")`)               |
+| `docs_list`     | List all available third-party documentation components                     |
+| `docs_search`   | Search documentation by name - returns full content of matches              |
 
-## Rules
-- You MUST read the project rules using `nocturnal_rules` and follow them at all times
-- You MUST follow the coding guidelines in `spec/coding guidelines.md`
-- Follow the specification for the active proposal (use `nocturnal_current` to retrieve it)
-- Update the active proposal's `implementation.md` as tasks are completed
-- Mark implementation checkboxes `[x]` when tasks are done
+## MCP Prompts
+
+Two implementation workflows are available:
+
+| Prompt                 | Description                                                              |
+|------------------------|--------------------------------------------------------------------------|
+| `start-implementation` | **Methodical**: 5-phase process (investigate → plan tests → implement → validate → test). Fails fast - stops and asks user on any failure. |
+| `lazy`                 | **Fast**: Implements quickly, moves past blockers, documents incomplete items. Prioritizes progress over perfection. |
+
+## Rules for Agents
+
+1. **Read context first**: Always call `context` before starting work to get rules, spec, and design
+2. **Follow project rules**: Rules in `spec/rule/*.md` are mandatory constraints
+3. **Follow coding guidelines**: Located in `spec/coding guidelines.md`
+4. **Track progress**: Use `tasks` to see current work, `task_complete` to mark done
+5. **Update internal todo**: Keep your own task list in sync with Nocturnal tasks
+6. **Respect integrity warnings**: If `context` returns an integrity warning about changed files, STOP and ask user to confirm
