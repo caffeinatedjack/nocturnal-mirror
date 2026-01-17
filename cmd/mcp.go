@@ -41,14 +41,17 @@ func runMCP(cmd *cobra.Command, args []string) {
 		server.WithPromptCapabilities(true),
 	)
 
-	// Tools (breaking change by design): keep only context + docs.
+	// Tools
 	registerContextTool(s)
+	registerTasksTool(s)
+	registerTaskCompleteTool(s)
 	registerDocsListTool(s)
 	registerDocsSearchTool(s)
 
 	// Prompts
 	registerAddThirdPartyDocsPrompt(s)
 	registerStartImplementationPrompt(s)
+	registerLazyPrompt(s)
 
 	if err := server.ServeStdio(s); err != nil {
 		fmt.Fprintf(os.Stderr, "MCP server error: %v\n", err)
@@ -58,7 +61,7 @@ func runMCP(cmd *cobra.Command, args []string) {
 
 func registerContextTool(s *server.MCPServer) {
 	tool := mcp.NewTool("context",
-		mcp.WithDescription("Get the minimum project context needed to implement the active proposal (rules, proposal docs, and tasks)."),
+		mcp.WithDescription("Get project context for implementing the active proposal: rules, project design, specification, and design docs."),
 	)
 
 	s.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -112,27 +115,6 @@ func registerContextTool(s *server.MCPServer) {
 			sections = append(sections, activeHeader+"\n(No specification.md or design.md found)")
 		}
 
-		// Tasks (open tasks only, to keep context lean)
-		implPath := filepath.Join(proposalPath, "implementation.md")
-		implContent, err := os.ReadFile(implPath)
-		if err != nil {
-			if os.IsNotExist(err) {
-				sections = append(sections, "# Implementation Tasks\n\nNo implementation.md found")
-				return mcp.NewToolResultText(strings.Join(sections, "\n\n---\n\n")), nil
-			}
-			return mcp.NewToolResultError(fmt.Sprintf("Failed to read implementation.md: %v", err)), nil
-		}
-
-		total, completed := getProposalProgress(proposalPath)
-		openTasks := extractOpenTasks(string(implContent))
-
-		tasksHeader := fmt.Sprintf("# Implementation Tasks\n\nProgress: %d/%d complete\n\n", completed, total)
-		if len(openTasks) == 0 {
-			sections = append(sections, tasksHeader+"No open tasks found")
-		} else {
-			sections = append(sections, tasksHeader+strings.Join(openTasks, "\n"))
-		}
-
 		// Include affected files if configured
 		config := loadConfigOrDefault(specPath)
 		if config.Context.IncludeAffectedFiles {
@@ -149,6 +131,67 @@ func registerContextTool(s *server.MCPServer) {
 	})
 }
 
+func registerTasksTool(s *server.MCPServer) {
+	tool := mcp.NewTool("tasks",
+		mcp.WithDescription("Get the current phase tasks for the active proposal. Shows only the first incomplete phase. Use task_complete to mark tasks done."),
+	)
+
+	s.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		specPath, err := checkSpecWorkspace()
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+
+		slug, proposalPath, err := getPrimaryProposal(specPath)
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+		if slug == "" {
+			return mcp.NewToolResultError("No active proposal"), nil
+		}
+
+		implPath := filepath.Join(proposalPath, "implementation.md")
+		implContent, err := os.ReadFile(implPath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				return mcp.NewToolResultText("No implementation.md found"), nil
+			}
+			return mcp.NewToolResultError(fmt.Sprintf("Failed to read implementation.md: %v", err)), nil
+		}
+
+		total, completed := getProposalProgress(proposalPath)
+		phases := extractPhases(string(implContent))
+
+		var result strings.Builder
+		result.WriteString(fmt.Sprintf("# Tasks for: %s\n\n", slug))
+		result.WriteString(fmt.Sprintf("Progress: %d/%d tasks complete\n\n", completed, total))
+
+		if len(phases) == 0 {
+			result.WriteString("No phases found in implementation.md")
+			return mcp.NewToolResultText(result.String()), nil
+		}
+
+		// Find current phase number
+		currentPhaseNum := 0
+		for i, p := range phases {
+			if !p.Complete {
+				currentPhaseNum = i + 1
+				break
+			}
+		}
+
+		currentPhase := getCurrentPhase(phases)
+		if currentPhase == nil {
+			result.WriteString("All phases complete!")
+		} else {
+			result.WriteString(formatPhaseForContext(currentPhase, currentPhaseNum, len(phases)))
+			result.WriteString("\n\n> Once all tasks in this phase are complete, the next phase will appear.")
+		}
+
+		return mcp.NewToolResultText(result.String()), nil
+	})
+}
+
 func extractOpenTasks(content string) []string {
 	var tasks []string
 	for _, line := range strings.Split(content, "\n") {
@@ -158,6 +201,159 @@ func extractOpenTasks(content string) []string {
 		}
 	}
 	return tasks
+}
+
+// Phase represents a phase from implementation.md with its tasks.
+type Phase struct {
+	Name      string
+	Goal      string
+	Tasks     []Task
+	Milestone string
+	Complete  bool
+}
+
+// Task represents a single task checkbox.
+type Task struct {
+	ID       string // Task ID in format "phase.task" (e.g., "1.1", "2.3")
+	Text     string
+	Complete bool
+	Line     int // Line number in the file (1-indexed)
+}
+
+// extractPhases parses implementation.md content and returns all phases with their tasks.
+func extractPhases(content string) []Phase {
+	var phases []Phase
+	var currentPhase *Phase
+	phaseNum := 0
+	lines := strings.Split(content, "\n")
+
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+
+		// Check for phase header (### Phase N: Name)
+		if strings.HasPrefix(trimmed, "### Phase") {
+			// Save previous phase if exists
+			if currentPhase != nil {
+				currentPhase.Complete = isPhaseComplete(currentPhase)
+				phases = append(phases, *currentPhase)
+			}
+
+			phaseNum++
+
+			// Extract phase name
+			name := trimmed
+			if colonIdx := strings.Index(trimmed, ":"); colonIdx != -1 {
+				name = strings.TrimSpace(trimmed[colonIdx+1:])
+			}
+
+			currentPhase = &Phase{Name: name}
+			continue
+		}
+
+		// Only process if we're inside a phase
+		if currentPhase == nil {
+			continue
+		}
+
+		// Check for Goal
+		if strings.HasPrefix(trimmed, "**Goal**:") {
+			currentPhase.Goal = strings.TrimSpace(strings.TrimPrefix(trimmed, "**Goal**:"))
+			continue
+		}
+
+		// Check for Milestone
+		if strings.HasPrefix(trimmed, "**Milestone**:") {
+			currentPhase.Milestone = strings.TrimSpace(strings.TrimPrefix(trimmed, "**Milestone**:"))
+			continue
+		}
+
+		// Check for task checkboxes
+		if strings.HasPrefix(trimmed, "- [ ]") {
+			taskNum := len(currentPhase.Tasks) + 1
+			currentPhase.Tasks = append(currentPhase.Tasks, Task{
+				ID:       fmt.Sprintf("%d.%d", phaseNum, taskNum),
+				Text:     strings.TrimSpace(strings.TrimPrefix(trimmed, "- [ ]")),
+				Complete: false,
+				Line:     i + 1,
+			})
+		} else if strings.HasPrefix(trimmed, "- [x]") || strings.HasPrefix(trimmed, "- [X]") {
+			text := trimmed
+			if strings.HasPrefix(trimmed, "- [x]") {
+				text = strings.TrimPrefix(trimmed, "- [x]")
+			} else {
+				text = strings.TrimPrefix(trimmed, "- [X]")
+			}
+			taskNum := len(currentPhase.Tasks) + 1
+			currentPhase.Tasks = append(currentPhase.Tasks, Task{
+				ID:       fmt.Sprintf("%d.%d", phaseNum, taskNum),
+				Text:     strings.TrimSpace(text),
+				Complete: true,
+				Line:     i + 1,
+			})
+		}
+
+		// Stop at next major section (## header that's not a phase)
+		if strings.HasPrefix(trimmed, "## ") && !strings.HasPrefix(trimmed, "### ") {
+			break
+		}
+	}
+
+	// Don't forget the last phase
+	if currentPhase != nil {
+		currentPhase.Complete = isPhaseComplete(currentPhase)
+		phases = append(phases, *currentPhase)
+	}
+
+	return phases
+}
+
+// isPhaseComplete returns true if all tasks in the phase are complete.
+func isPhaseComplete(p *Phase) bool {
+	if len(p.Tasks) == 0 {
+		return false
+	}
+	for _, task := range p.Tasks {
+		if !task.Complete {
+			return false
+		}
+	}
+	return true
+}
+
+// getCurrentPhase returns the first incomplete phase, or nil if all complete.
+func getCurrentPhase(phases []Phase) *Phase {
+	for i := range phases {
+		if !phases[i].Complete {
+			return &phases[i]
+		}
+	}
+	return nil
+}
+
+// formatPhaseForContext formats a phase for the context output.
+func formatPhaseForContext(phase *Phase, phaseNum int, totalPhases int) string {
+	var buf strings.Builder
+
+	buf.WriteString(fmt.Sprintf("### Current Phase: %d of %d - %s\n\n", phaseNum, totalPhases, phase.Name))
+
+	if phase.Goal != "" {
+		buf.WriteString(fmt.Sprintf("**Goal**: %s\n\n", phase.Goal))
+	}
+
+	buf.WriteString("**Tasks** (use task_complete with the ID to mark done):\n")
+	for _, task := range phase.Tasks {
+		if task.Complete {
+			buf.WriteString(fmt.Sprintf("- [x] `%s` %s\n", task.ID, task.Text))
+		} else {
+			buf.WriteString(fmt.Sprintf("- [ ] `%s` %s\n", task.ID, task.Text))
+		}
+	}
+
+	if phase.Milestone != "" {
+		buf.WriteString(fmt.Sprintf("\n**Milestone**: %s\n", phase.Milestone))
+	}
+
+	return buf.String()
 }
 
 // buildAffectedFilesSection creates a section with affected file contents.
@@ -285,6 +481,109 @@ func registerDocsSearchTool(s *server.MCPServer) {
 	})
 }
 
+func registerTaskCompleteTool(s *server.MCPServer) {
+	tool := mcp.NewTool("task_complete",
+		mcp.WithDescription("Mark a task as complete in the active proposal's implementation.md using its task ID (e.g., '1.1', '2.3')."),
+		mcp.WithString("id",
+			mcp.Required(),
+			mcp.Description("The task ID to mark as complete (e.g., '1.1' for phase 1, task 1)"),
+		),
+	)
+
+	s.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		taskID, ok := request.Params.Arguments["id"].(string)
+		if !ok {
+			return mcp.NewToolResultError("id parameter must be a string"), nil
+		}
+		taskID = strings.TrimSpace(taskID)
+
+		specPath, err := checkSpecWorkspace()
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+
+		slug, proposalPath, err := getPrimaryProposal(specPath)
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+		if slug == "" {
+			return mcp.NewToolResultError("No active proposal"), nil
+		}
+
+		implPath := filepath.Join(proposalPath, "implementation.md")
+		content, err := os.ReadFile(implPath)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Failed to read implementation.md: %v", err)), nil
+		}
+
+		// Parse phases to find the task by ID
+		phases := extractPhases(string(content))
+		var targetTask *Task
+		for _, phase := range phases {
+			for i := range phase.Tasks {
+				if phase.Tasks[i].ID == taskID {
+					targetTask = &phase.Tasks[i]
+					break
+				}
+			}
+			if targetTask != nil {
+				break
+			}
+		}
+
+		if targetTask == nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Task ID not found: %s", taskID)), nil
+		}
+
+		if targetTask.Complete {
+			return mcp.NewToolResultError(fmt.Sprintf("Task %s is already complete", taskID)), nil
+		}
+
+		// Replace the task at the specific line
+		lines := strings.Split(string(content), "\n")
+		lineIdx := targetTask.Line - 1 // Convert to 0-indexed
+
+		if lineIdx < 0 || lineIdx >= len(lines) {
+			return mcp.NewToolResultError("Internal error: invalid line number"), nil
+		}
+
+		line := lines[lineIdx]
+		// Preserve indentation and replace checkbox
+		indent := line[:len(line)-len(strings.TrimLeft(line, " \t"))]
+		lines[lineIdx] = indent + "- [x] " + targetTask.Text
+
+		// Write back
+		newContent := strings.Join(lines, "\n")
+		if err := os.WriteFile(implPath, []byte(newContent), 0644); err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Failed to write implementation.md: %v", err)), nil
+		}
+
+		// Get updated progress
+		total, completed := getProposalProgress(proposalPath)
+		updatedPhases := extractPhases(newContent)
+		currentPhase := getCurrentPhase(updatedPhases)
+
+		var result strings.Builder
+		result.WriteString(fmt.Sprintf("Task %s marked complete: %s\n\n", taskID, targetTask.Text))
+		result.WriteString(fmt.Sprintf("Progress: %d/%d tasks complete\n", completed, total))
+
+		if currentPhase == nil {
+			result.WriteString("\nAll phases complete!")
+		} else {
+			// Count remaining tasks in current phase
+			remaining := 0
+			for _, t := range currentPhase.Tasks {
+				if !t.Complete {
+					remaining++
+				}
+			}
+			result.WriteString(fmt.Sprintf("Current phase: %s (%d tasks remaining)", currentPhase.Name, remaining))
+		}
+
+		return mcp.NewToolResultText(result.String()), nil
+	})
+}
+
 func registerAddThirdPartyDocsPrompt(s *server.MCPServer) {
 	prompt := mcp.NewPrompt("add-third-party-docs",
 		mcp.WithPromptDescription("Generate condensed documentation for third-party libraries"),
@@ -321,7 +620,7 @@ Documentation URLs to process:
 
 func registerStartImplementationPrompt(s *server.MCPServer) {
 	prompt := mcp.NewPrompt("start-implementation",
-		mcp.WithPromptDescription("Start an implementation using Nocturnal context tools"),
+		mcp.WithPromptDescription("Methodical implementation with investigation, planning, testing, and validation phases"),
 		mcp.WithArgument("goal",
 			mcp.ArgumentDescription("Short description of what you want to implement (optional)"),
 		),
@@ -334,20 +633,353 @@ func registerStartImplementationPrompt(s *server.MCPServer) {
 			goalStr = fmt.Sprintf("Goal: %s\n\n", goal)
 		}
 
-		promptText := fmt.Sprintf(`%sYou will implement the active proposal in this repository.
+		promptText := fmt.Sprintf(`%sYou will implement the active proposal using a methodical, fail-fast approach with multiple validation checkpoints.
 
-1) Call the MCP tool "context".
-2) Read the returned context carefully and treat it as the source of truth.
-3) If the tool returns an integrity warning about modified proposal files, STOP and ask the user to either re-activate the proposal or confirm proceeding.
-4) Identify the key constraints (rules + non-goals) and the MUST-level requirements from the specification.
-5) Implement changes in small, reviewable steps. Do not introduce unrelated refactors.
-6) If you need third-party API details, use docs_search (and only fetch what you need).
-7) When you finish, summarize what you changed and what requirements you believe are satisfied.
-8) Ask the user to run tests/linters and confirm results (do not claim you ran anything).
+## Philosophy
+
+- **Fail fast**: If any phase fails, STOP and ask the user for guidance before proceeding
+- **Ask questions**: When uncertain, ask the user for clarification rather than guessing
+- **Quality over speed**: Each phase must complete successfully before moving to the next
+- **Subagent isolation**: Each phase runs as a separate subagent for clean separation of concerns
+
+## Setup
+
+1) Call the MCP tool "context" to get the specification and design.
+2) Call the MCP tool "tasks" to get the current phase tasks.
+3) If there's an integrity warning about modified proposal files, STOP and ask the user to confirm.
+4) Update your internal todo/task list with the tasks from the current phase.
+
+## Implementation Lifecycle
+
+For EACH task, run through these phases sequentially. If any phase fails, STOP and ask the user for guidance.
+
+### Phase 1: Investigation (Subagent)
+
+Spawn a subagent with this task:
+
+---
+INVESTIGATION TASK:
+
+You are an investigation agent. Analyze the codebase and create an implementation plan.
+
+**Task to implement:** [Task description from tasks tool]
+**Specification:** [Include relevant spec sections]
+**Design:** [Include relevant design sections]
+
+**Instructions:**
+1. Identify all files that need to be modified or created
+2. Identify dependencies and potential conflicts
+3. List any ambiguities or questions about the requirements
+4. Create a step-by-step implementation plan
+
+**Output format:**
+INVESTIGATION REPORT
+====================
+Files to modify: [list]
+Files to create: [list]
+Dependencies: [list]
+Questions/Ambiguities: [list - if any, mark as BLOCKING or NON-BLOCKING]
+Implementation plan:
+1. [step]
+2. [step]
+...
+---
+
+If the investigation report contains BLOCKING questions, STOP and ask the user to resolve them.
+
+### Phase 2: Test Planning (Subagent)
+
+Spawn a subagent with this task:
+
+---
+TEST PLANNING TASK:
+
+You are a test planning agent. Define the testing requirements BEFORE implementation.
+
+**Task to implement:** [Task description]
+**Implementation plan:** [From Phase 1]
+**Specification requirements:** [Relevant MUST/SHOULD/MAY items]
+
+**Instructions:**
+1. Define acceptance criteria based on the specification
+2. List specific test cases that must pass
+3. Identify edge cases and error conditions
+4. Specify any integration test requirements
+
+**Output format:**
+TEST PLAN
+=========
+Acceptance criteria:
+- [ ] [criterion 1]
+- [ ] [criterion 2]
+...
+
+Test cases:
+- [ ] [test case 1]: [expected behavior]
+- [ ] [test case 2]: [expected behavior]
+...
+
+Edge cases:
+- [ ] [edge case 1]: [expected behavior]
+...
+
+Integration requirements:
+- [any cross-component testing needs]
+---
+
+Review the test plan. If it seems incomplete or incorrect, ask the user for input.
+
+### Phase 3: Implementation (Subagent)
+
+Spawn a subagent with this task:
+
+---
+IMPLEMENTATION TASK:
+
+You are an implementation agent. Write the code changes.
+
+**Task to implement:** [Task description]
+**Implementation plan:** [From Phase 1]
+**Test plan:** [From Phase 2]
+
+**Instructions:**
+1. Follow the implementation plan step by step
+2. Keep changes minimal and focused on the task
+3. Do not introduce unrelated refactors
+4. Add appropriate comments for complex logic
+5. If you need third-party API details, use docs_search
+
+**Output format:**
+IMPLEMENTATION REPORT
+=====================
+Files modified: [list with brief description of changes]
+Files created: [list with brief description]
+Notes: [any implementation decisions or deviations from plan]
+---
+
+### Phase 4: Validation (Subagent)
+
+Spawn a subagent with this task:
+
+---
+VALIDATION TASK:
+
+You are a validation agent. Verify the implementation against the test plan and specification.
+
+**Task implemented:** [Task description]
+**Test plan:** [From Phase 2]
+**Specification requirements:** [Relevant sections]
+
+**Instructions:**
+1. Review the code changes
+2. Verify each acceptance criterion is met
+3. Check each test case can pass
+4. Verify edge cases are handled
+5. Check for specification compliance
+
+**Output format:**
+VALIDATION REPORT
+=================
+Status: PASS | FAIL
+
+Acceptance criteria:
+- [x] or [ ] [criterion]: [explanation]
+...
+
+Test case coverage:
+- [x] or [ ] [test case]: [explanation]
+...
+
+Specification compliance:
+- [x] or [ ] [requirement]: [explanation]
+...
+
+Issues found (if FAIL):
+- [issue description and location]
+...
+---
+
+If validation FAILS, STOP and ask the user whether to:
+a) Fix the issues and re-run from Phase 3
+b) Adjust the requirements/plan
+c) Skip this task and document it as incomplete
+
+### Phase 5: Testing (Subagent)
+
+Spawn a subagent with this task:
+
+---
+TESTING TASK:
+
+You are a testing agent. Execute all available tests.
+
+**Instructions:**
+1. Run the project's unit tests
+2. Run any linters or formatters
+3. Run integration tests if available
+4. Report all results
+
+**Output format:**
+TEST RESULTS
+============
+Unit tests: PASS | FAIL
+  [summary or failure details]
+
+Linting: PASS | FAIL
+  [summary or issues]
+
+Integration tests: PASS | FAIL | N/A
+  [summary or failure details]
+
+Overall: PASS | FAIL
+---
+
+If tests FAIL, STOP and ask the user for guidance.
+
+## After Each Task
+
+1. If all phases PASS: Call task_complete with the task ID
+2. Update your internal todo/task list
+3. Call tasks to get the next task
+4. Repeat the lifecycle for the next task
+
+## Completion
+
+When all tasks are complete:
+1. Summarize all changes made
+2. List which specification requirements are satisfied
+3. Note any deferred items or known limitations
 `, goalStr)
 
 		return &mcp.GetPromptResult{
-			Description: "Bootstrap instructions for implementing using Nocturnal context",
+			Description: "Methodical implementation with investigation, planning, testing, and validation phases",
+			Messages: []mcp.PromptMessage{
+				{
+					Role: mcp.RoleUser,
+					Content: mcp.TextContent{
+						Type: "text",
+						Text: promptText,
+					},
+				},
+			},
+		}, nil
+	})
+}
+
+func registerLazyPrompt(s *server.MCPServer) {
+	prompt := mcp.NewPrompt("lazy",
+		mcp.WithPromptDescription("Fast autonomous implementation - implements quickly, moves on from blockers"),
+		mcp.WithArgument("goal",
+			mcp.ArgumentDescription("Short description of what you want to implement (optional)"),
+		),
+	)
+
+	s.AddPrompt(prompt, func(ctx context.Context, request mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
+		goalStr := ""
+		goal := strings.TrimSpace(request.Params.Arguments["goal"])
+		if goal != "" {
+			goalStr = fmt.Sprintf("Goal: %s\n\n", goal)
+		}
+
+		promptText := fmt.Sprintf(`%sYou will implement the active proposal as quickly as possible, moving past blockers.
+
+## Philosophy
+
+- **Speed over perfection**: Get something working, then iterate
+- **Move past blockers**: If a task is hard, partially complete it and move on
+- **Autonomous**: Don't ask for user input unless completely stuck
+- **Document incompleteness**: Always note what was skipped or partially done
+
+## Setup
+
+1) Call the MCP tool "context" to get the specification and design.
+2) Call the MCP tool "tasks" to get the current phase tasks.
+3) If there's an integrity warning, STOP and ask the user to confirm.
+4) Update your internal todo/task list with tasks from the current phase.
+
+## Implementation Loop
+
+REPEAT for each task until all phases are complete:
+
+### Step 1: Implement Immediately
+
+- Read the task description
+- Implement it directly without extensive planning
+- If you need third-party API details, use docs_search
+- Time-box yourself: if stuck for more than a few attempts, go to Step 2
+
+### Step 2: Handle Blockers
+
+If a task is difficult or blocked:
+1. Implement what you CAN do
+2. Add a code comment: // TODO: [what remains to be done]
+3. Note the partial completion in your summary
+4. Mark the task complete anyway and move on
+
+### Step 3: Quick Validation (Subagent)
+
+After completing each task, spawn a quick validation subagent:
+
+---
+QUICK VALIDATION:
+
+Task: [task description]
+Changes made: [brief summary]
+
+Check:
+1. Does the code compile/parse without errors?
+2. Are there obvious bugs or missing pieces?
+3. Does it roughly satisfy the task intent?
+
+Reply: GOOD (proceed) | ISSUES: [brief list]
+---
+
+- If GOOD: Continue to next task
+- If ISSUES: Make a quick fix attempt, then move on regardless
+
+### Step 4: Mark Complete
+
+- Call task_complete with the task ID
+- Update your internal todo/task list
+- Call tasks to get the next task or phase
+
+## End of Phase Testing (Subagent)
+
+After completing ALL tasks in a phase, spawn a test subagent:
+
+---
+TEST TASK:
+
+Run all project tests:
+1. Unit tests
+2. Linting/formatting
+3. Integration tests (if available)
+
+Report: PASS | FAIL with summary
+---
+
+- If PASS: Proceed to next phase
+- If FAIL: Make ONE quick fix attempt, then proceed anyway and note the failures
+
+## Completion
+
+When all phases are complete:
+1. List all changes made
+2. List any partial completions or skipped items
+3. List test failures if any
+4. Ask user to review and decide on follow-up
+
+## Important Notes
+
+- Do NOT get stuck on any single task - time-box and move on
+- Do NOT ask for user input during the loop
+- ALWAYS document what was skipped or partially done
+- Prefer working code with TODOs over perfect but incomplete implementation
+- Update your internal todo/task list after each task
+`, goalStr)
+
+		return &mcp.GetPromptResult{
+			Description: "Fast autonomous implementation - implements quickly, moves on from blockers",
 			Messages: []mcp.PromptMessage{
 				{
 					Role: mcp.RoleUser,

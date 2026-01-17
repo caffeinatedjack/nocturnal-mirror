@@ -1,0 +1,6 @@
+validation:
+    strict: false
+    require_sections: []
+context:
+    include_affected_files: false
+    max_file_lines: 50

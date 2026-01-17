@@ -158,7 +158,7 @@ Search library and API documentation by name. Returns full content of matching d
 - Returns message if no documentation found
 - Returns message if no components match the query
 
-## MCP Prompt
+## MCP Prompts
 
 ### add-third-party-docs
 
@@ -188,4 +188,100 @@ urls: "https://pkg.go.dev/github.com/spf13/cobra, https://cobra.dev/docs"
 
 The AI will then create a condensed documentation file covering the library's key concepts, APIs, and usage patterns.
 
+---
+
+### start-implementation
+
+Methodical, fail-fast implementation with multiple validation checkpoints.
+
+**Arguments:**
+
+| Name | Type   | Required | Description                                                |
+|------|--------|----------|------------------------------------------------------------|
+| goal | string | No       | Short description of what you want to implement (optional) |
+
+**What it does:**
+
+For each task, runs through 5 phases as separate subagents:
+
+1. **Investigation** - Analyze codebase, create implementation plan, identify blocking questions
+2. **Test Planning** - Define acceptance criteria and test cases BEFORE implementation
+3. **Implementation** - Write code changes following the plan
+4. **Validation** - Verify implementation against test plan and specification
+5. **Testing** - Run unit tests, linters, and integration tests
+
+**Philosophy:**
+- Fail fast: If any phase fails, STOP and ask the user for guidance
+- Ask questions: When uncertain, ask rather than guess
+- Quality over speed: Each phase must pass before proceeding
+
+---
+
+### lazy
+
+Fast, autonomous implementation that prioritizes speed over perfection.
+
+**Arguments:**
+
+| Name | Type   | Required | Description                                                |
+|------|--------|----------|------------------------------------------------------------|
+| goal | string | No       | Short description of what you want to implement (optional) |
+
+**What it does:**
+
+1. Implements tasks immediately without extensive planning
+2. If blocked, partially completes the task, adds TODO comments, and moves on
+3. Spawns quick validation subagent after each task
+4. Runs tests at end of each phase but proceeds even if they fail
+5. Documents all partial completions and skipped items
+
+**Philosophy:**
+- Speed over perfection: Get something working, then iterate
+- Move past blockers: Don't get stuck on any single task
+- Document incompleteness: Always note what was skipped or partially done
+
+Autonomous implementation loop that uses the project spec workspace to drive task-by-task execution.
+
+**Arguments:**
+
+| Name | Type   | Required | Description                                                |
+|------|--------|----------|------------------------------------------------------------|
+| goal | string | No       | Short description of what you want to implement (optional) |
+
+**What it does:**
+
+Returns a prompt instructing the AI to:
+1. Call `context` and treat it as the source of truth
+2. Call `tasks` to get the first incomplete phase
+3. Implement tasks one at a time
+4. After each task, call `task_complete(id: "X.Y")` and update the agent's internal todo/task list
+5. After finishing a phase, spawn a validation subagent; if validation fails, iterate
+6. Loop until `tasks` reports "All phases complete!"
+
+**Important behavior notes:**
+- `tasks` only returns the **current phase**, not all phases.
+- If `context` returns an integrity warning about changed proposal files, the agent should stop until the user confirms.
+- The agent is reminded to keep its internal todo/task list updated (separate from the Nocturnal task tracking).
+
+Autonomous implementation loop (“ralphing”) that uses the project spec workspace to drive task-by-task execution.
+
+**Arguments:**
+
+| Name | Type   | Required | Description                                                |
+|------|--------|----------|------------------------------------------------------------|
+| goal | string | No       | Short description of what you want to implement (optional) |
+
+**What it does:**
+
+Returns a prompt instructing the AI to:
+1. Call `context` and treat it as the source of truth
+2. Call `tasks` to get the first incomplete phase
+3. Implement tasks one at a time
+4. After each task, call `task_complete(id: "X.Y")`
+5. After finishing a phase, spawn a validation subagent; if validation fails, iterate
+6. Loop until `tasks` reports “All phases complete!”
+
+**Important behavior notes:**
+- `tasks` only returns the **current phase**, not all phases.
+- If `context` returns an integrity warning about changed proposal files, the agent should stop until the user confirms.
 

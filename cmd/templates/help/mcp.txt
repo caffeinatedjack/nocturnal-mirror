@@ -4,13 +4,16 @@ This allows AI assistants and other MCP clients to interact with nocturnal's
 agent functionality programmatically.
 
 Exposed tools:
-    context         Get project context for implementing the active proposal
+    context         Get project context (rules, spec, design) for the active proposal
+    tasks           Get current phase tasks (use task_complete to mark done)
+    task_complete   Mark a task as complete by ID (e.g., "1.1")
     docs_list       List available library and API documentation
     docs_search     Search library and API documentation by name
 
 Exposed prompts:
-    start-implementation  Start an implementation using Nocturnal context
+    start-implementation  Methodical implementation with investigation, planning, and testing phases
     add-third-party-docs  Generate condensed documentation for third-party libraries
+    lazy                  Fast autonomous implementation - moves past blockers quickly
 
 Example:
     nocturnal mcp
