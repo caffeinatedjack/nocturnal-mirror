@@ -1,0 +1,14 @@
+Create a new maintenance item.
+
+Usage:
+    nocturnal spec maintenance add <name-or-slug>
+
+This creates a new file in spec/maintenance/<slug>.md with a template
+for defining requirements.
+
+Each requirement must include an [id=...] tag for tracking.
+Frequency tags [freq=...] are optional (daily, weekly, biweekly, monthly, quarterly, yearly).
+If frequency is omitted, the requirement is always due.
+
+Example:
+    nocturnal spec maintenance add "Go dependencies"

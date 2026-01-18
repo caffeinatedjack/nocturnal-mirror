@@ -14,6 +14,7 @@ const configFileName = "nocturnal.yaml"
 type Config struct {
 	Validation ValidationConfig `yaml:"validation"`
 	Context    ContextConfig    `yaml:"context"`
+	Git        GitConfig        `yaml:"git"`
 }
 
 // ValidationConfig controls proposal validation behavior.
@@ -28,6 +29,12 @@ type ContextConfig struct {
 	MaxFileLines         int  `yaml:"max_file_lines"`         // Max lines to include per file
 }
 
+// GitConfig controls git integration behavior.
+type GitConfig struct {
+	AutoSnapshot bool `yaml:"auto_snapshot"` // Automatically create git snapshots before tasks
+	AutoCommit   bool `yaml:"auto_commit"`   // Automatically commit changes when tasks complete
+}
+
 // DefaultConfig returns the default configuration.
 func DefaultConfig() *Config {
 	return &Config{
@@ -38,6 +45,10 @@ func DefaultConfig() *Config {
 		Context: ContextConfig{
 			IncludeAffectedFiles: false,
 			MaxFileLines:         50,
+		},
+		Git: GitConfig{
+			AutoSnapshot: true,
+			AutoCommit:   true,
 		},
 	}
 }

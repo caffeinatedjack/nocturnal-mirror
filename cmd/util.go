@@ -51,13 +51,14 @@ func cwdPath(elem ...string) string {
 }
 
 const (
-	specDir     = "spec"
-	ruleDir     = "rule"
-	proposalDir = "proposal"
-	archiveDir  = "archive"
-	sectionDir  = "section"
-	projectFile = "project.md"
-	agentsFile  = "AGENTS.md"
+	specDir        = "spec"
+	ruleDir        = "rule"
+	proposalDir    = "proposal"
+	archiveDir     = "archive"
+	sectionDir     = "section"
+	maintenanceDir = "maintenance"
+	projectFile    = "project.md"
+	agentsFile     = "AGENTS.md"
 )
 
 var proposalDocFiles = []string{"specification.md", "design.md", "implementation.md"}
@@ -310,4 +311,10 @@ func readAffectedFileContent(filePath string, maxLines int) (string, bool, error
 
 	truncated := strings.Join(lines[:maxLines], "\n")
 	return truncated, true, nil
+}
+
+// isGitRepo checks if the current directory is a git repository
+func isGitRepo() bool {
+	_, err := os.Stat(".git")
+	return err == nil
 }

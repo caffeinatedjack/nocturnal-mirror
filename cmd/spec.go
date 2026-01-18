@@ -588,6 +588,7 @@ func runSpecInit(cmd *cobra.Command, args []string) {
 		filepath.Join(specPath, proposalDir),
 		filepath.Join(specPath, archiveDir),
 		filepath.Join(specPath, sectionDir),
+		filepath.Join(specPath, maintenanceDir),
 	}
 
 	for _, dir := range dirs {

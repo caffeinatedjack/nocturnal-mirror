@@ -1,0 +1,12 @@
+Mark a requirement as actioned (records current timestamp).
+
+Usage:
+    nocturnal spec maintenance actioned <slug> <id>
+
+Records the current time as the last actioned time for the specified requirement.
+This updates the due calculation for future runs.
+
+The ID must exist in the maintenance file, otherwise this command will error.
+
+Example:
+    nocturnal spec maintenance actioned go-deps lint

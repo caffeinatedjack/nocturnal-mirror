@@ -1,0 +1,6 @@
+Show the full content of a maintenance item.
+
+Usage:
+    nocturnal spec maintenance show <slug>
+
+Displays the entire maintenance file including all requirements.

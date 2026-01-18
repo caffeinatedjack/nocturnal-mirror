@@ -1,0 +1,11 @@
+Show only the requirements that are currently due for a maintenance item.
+
+Usage:
+    nocturnal spec maintenance due <slug>
+
+A requirement is due if:
+- It has never been actioned, OR
+- Its frequency interval has elapsed since last actioned, OR
+- It has no frequency tag (always due)
+
+Shows requirement IDs so you can mark them as actioned.

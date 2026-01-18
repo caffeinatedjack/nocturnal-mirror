@@ -13,10 +13,24 @@ const stateFile = ".nocturnal.json"
 
 // State represents the nocturnal state file (spec/.nocturnal.json).
 type State struct {
-	Version int                          `json:"version"`
-	Active  []string                     `json:"active"`
-	Primary string                       `json:"primary"`
-	Hashes  map[string]map[string]string `json:"hashes,omitempty"`
+	Version      int                                    `json:"version"`
+	Active       []string                               `json:"active"`
+	Primary      string                                 `json:"primary"`
+	Hashes       map[string]map[string]string           `json:"hashes,omitempty"`
+	Maintenance  map[string]map[string]MaintenanceState `json:"maintenance,omitempty"`
+	GitSnapshots map[string]GitSnapshotState            `json:"git_snapshots,omitempty"`
+}
+
+// GitSnapshotState tracks git snapshots for task execution
+type GitSnapshotState struct {
+	SnapshotRef string `json:"snapshot_ref,omitempty"` // Git ref at snapshot time
+	TaskID      string `json:"task_id"`
+	Timestamp   string `json:"timestamp"` // RFC3339 timestamp
+}
+
+// MaintenanceState tracks when a maintenance requirement was last actioned.
+type MaintenanceState struct {
+	LastActioned string `json:"last_actioned"` // RFC3339 timestamp
 }
 
 // getStatePath returns the path to the state file.
@@ -30,7 +44,13 @@ func loadState(specPath string) (*State, error) {
 	data, err := os.ReadFile(statePath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return &State{Version: 1, Active: []string{}, Hashes: make(map[string]map[string]string)}, nil
+			return &State{
+				Version:      1,
+				Active:       []string{},
+				Hashes:       make(map[string]map[string]string),
+				Maintenance:  make(map[string]map[string]MaintenanceState),
+				GitSnapshots: make(map[string]GitSnapshotState),
+			}, nil
 		}
 		return nil, fmt.Errorf("failed to read state file: %w", err)
 	}
@@ -42,6 +62,14 @@ func loadState(specPath string) (*State, error) {
 
 	if state.Hashes == nil {
 		state.Hashes = make(map[string]map[string]string)
+	}
+
+	if state.Maintenance == nil {
+		state.Maintenance = make(map[string]map[string]MaintenanceState)
+	}
+
+	if state.GitSnapshots == nil {
+		state.GitSnapshots = make(map[string]GitSnapshotState)
 	}
 
 	return &state, nil

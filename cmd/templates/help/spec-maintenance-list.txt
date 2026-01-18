@@ -1,0 +1,7 @@
+List all maintenance items with their due requirement counts.
+
+Usage:
+    nocturnal spec maintenance list
+
+Shows each maintenance item slug with the number of requirements that are
+currently due based on their frequency and last actioned time.

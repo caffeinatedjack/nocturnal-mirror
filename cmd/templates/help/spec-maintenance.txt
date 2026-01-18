@@ -1,0 +1,9 @@
+Manage maintenance requirements for operational tasks like dependency upgrades
+and periodic checks.
+
+Maintenance items are stored as simple requirement lists in spec/maintenance/.
+Each requirement can optionally declare a frequency (daily, weekly, monthly, etc.).
+The system tracks when requirements were last actioned and computes which ones
+are currently due.
+
+Use the 'maintenance_context' MCP tool to get due requirements for agent execution.
