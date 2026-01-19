@@ -10,4 +10,5 @@ Commands:
 Examples:
     nocturnal spec init
     nocturnal spec proposal add my-feature
+    nocturnal agent current
     nocturnal mcp
