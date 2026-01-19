@@ -1,7 +1,8 @@
 # Agent Instructions
 
-This repository contains **nocturnal**, a Go CLI tool for specification management and agent tooling.
-This document provides guidelines for AI coding agents working in this codebase.
+This repository contains **nocturnal**, a Go CLI tool for specification-driven development with AI agent integration via MCP (Model Context Protocol).
+
+Nocturnal manages specifications, proposals, rules, maintenance tasks, and third-party documentation in a structured workspace. It exposes project context to AI agents through an MCP server.
 
 ## Quick Reference
 
@@ -28,14 +29,31 @@ make deps                     # Download and tidy dependencies
 nocturnal/
 ├── main.go              # Entry point, sets version/build vars
 ├── cmd/                 # CLI commands (Cobra-based)
-│   ├── root.go          # Root command and completion
-│   ├── agent.go         # Agent context commands
+│   ├── root.go          # Root command and shell completion
+│   ├── agent.go         # Agent context commands (current, project, specs)
 │   ├── docs.go          # Third-party documentation management
-│   ├── mcp.go           # MCP server implementation
-│   ├── spec.go          # Specification management commands
+│   ├── mcp.go           # MCP server with tools and prompts
+│   ├── spec.go          # Specification and proposal commands
+│   ├── maintenance.go   # Recurring maintenance task management
+│   ├── stats.go         # Project statistics and metrics
+│   ├── graph.go         # Proposal dependency graph visualization
+│   ├── config.go        # Configuration management
+│   ├── state.go         # State persistence (active proposals, etc.)
+│   ├── git.go           # Git snapshot and commit management
+│   ├── ui.go            # Terminal output styling
+│   ├── util.go          # Helper functions
 │   └── templates/       # Embedded templates and help text
-├── docs/                # Project documentation (for this repo)
+├── docs/                # Project documentation
 └── spec/                # Workspace (created per-project via `nocturnal spec init`)
+    ├── proposal/        # Active proposals
+    ├── section/         # Completed specifications
+    ├── archive/         # Archived design/implementation docs
+    ├── rule/            # Project-wide rules
+    ├── maintenance/     # Recurring maintenance items
+    ├── third/           # Third-party library documentation
+    ├── project.md       # Project design overview
+    ├── nocturnal.yaml   # Configuration file
+    └── .nocturnal.json  # State file (active proposals, hashes, etc.)
 ```
 
 ## Code Style Guidelines
@@ -199,3 +217,40 @@ nocturnal spec proposal complete my-feature # Archive and promote
 1. Create `registerMyTool(s *server.MCPServer)` function in `mcp.go`
 2. Define tool with `mcp.NewTool()` and handler
 3. Register in `runMCP()`: `registerMyTool(s)`
+
+### Adding an MCP Prompt
+
+1. Create `registerMyPrompt(s *server.MCPServer)` function in `mcp.go`
+2. Define prompt with `mcp.NewPrompt()` and handler
+3. Register in `runMCP()`: `registerMyPrompt(s)`
+4. Update `cmd/templates/help/mcp.txt` to document the new prompt
+
+Example:
+```go
+func registerMyPrompt(s *server.MCPServer) {
+    prompt := mcp.NewPrompt("my-prompt",
+        mcp.WithPromptDescription("Brief description of what this prompt does"),
+        mcp.WithArgument("arg1",
+            mcp.ArgumentDescription("Description of argument"),
+            mcp.RequiredArgument(), // Optional
+        ),
+    )
+
+    s.AddPrompt(prompt, func(ctx context.Context, request mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
+        promptText := `Instructions for the AI agent...`
+
+        return &mcp.GetPromptResult{
+            Description: "Brief description",
+            Messages: []mcp.PromptMessage{
+                {
+                    Role: mcp.RoleUser,
+                    Content: mcp.TextContent{
+                        Type: "text",
+                        Text: promptText,
+                    },
+                },
+            },
+        }, nil
+    })
+}
+```

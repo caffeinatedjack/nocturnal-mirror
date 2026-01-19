@@ -7,10 +7,46 @@ Proposals are the core workflow mechanism in Nocturnal. Each proposal represents
 The proposal lifecycle:
 
 1. **Add** - Create a new proposal with template documents
-2. **Activate** - Set as the current working proposal
-3. **Develop** - Edit documents and implement the feature
-4. **Validate** - Check documents against guidelines
-5. **Complete** - Archive design/implementation and promote specification
+2. **Elaborate** - Use the `elaborate-spec` MCP prompt to comprehensively design the proposal
+3. **Activate** - Set as the current working proposal
+4. **Develop** - Edit documents and implement the feature
+5. **Validate** - Check documents against guidelines
+6. **Complete** - Archive design/implementation and promote specification
+
+## Recommended Workflow with AI Agents
+
+For best results when working with AI agents via MCP:
+
+1. **Create the proposal**
+   ```bash
+   nocturnal spec proposal add my-feature
+   ```
+
+2. **Elaborate the specification** using the `elaborate-spec` MCP prompt
+   - Agent will ask which proposal to elaborate on
+   - Guides you through comprehensive requirements gathering
+   - Identifies dependencies on other proposals
+   - Highlights missing third-party documentation
+   - Creates detailed design.md and implementation.md with phased tasks
+   - Ensures 98% confidence before proceeding
+
+3. **Activate the proposal**
+   ```bash
+   nocturnal spec proposal activate my-feature
+   ```
+
+4. **Implement** using the `start-implementation` or `lazy` MCP prompt
+   - Agent reads context and tasks
+   - Works through phased implementation
+   - Marks tasks complete automatically
+
+5. **Validate and complete**
+   ```bash
+   nocturnal spec proposal validate my-feature
+   nocturnal spec proposal complete my-feature
+   ```
+
+This workflow ensures proposals are thoroughly planned before implementation begins.
 
 ## Commands
 

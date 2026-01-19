@@ -1,6 +1,10 @@
 # Agent Instructions
 
-This project uses Nocturnal for specification management. Specifications should be human-led - if a user asks for improvements to specs, remind them of this.
+This project uses Nocturnal for specification-driven development with AI agent integration. Specifications should be human-led - if a user asks for improvements to specs, remind them of this.
+
+## What is Nocturnal?
+
+Nocturnal is a tool that brings structure to software development by managing specifications, proposals, rules, and maintenance tasks. It exposes project context to AI agents through MCP (Model Context Protocol).
 
 ## Specification System Overview
 
@@ -17,47 +21,112 @@ Nocturnal uses a structured specification workflow with three document types per
 ```
 spec/
 ├── nocturnal.yaml               # Configuration file
+├── .nocturnal.json              # State file (active proposals, hashes, maintenance tracking)
 ├── project.md                   # Project overview, goals, architecture
+├── AGENTS.md                    # This file - instructions for AI agents
 ├── coding guidelines.md         # Code style, testing, error handling conventions
 ├── specification guidelines.md  # How to write specifications
 ├── design guidelines.md         # How to write design documents
 ├── rule/                        # Project-wide rules (MUST follow)
 │   └── *.md                     # Individual rule files
 ├── third/                       # Third-party library/API documentation
-│   └── *.md                     # Documentation components
+│   └── *.md                     # Documentation components (format: # name\ncontent\n---\n# name\ncontent)
 ├── proposal/                    # Work in progress
 │   └── <slug>/
 │       ├── specification.md     # What to build (requirements)
 │       ├── design.md            # How to build it (architecture)
-│       └── implementation.md    # Progress tracking (tasks)
+│       ├── implementation.md    # Progress tracking (tasks)
+│       └── affected-files.txt   # Optional: List of files this proposal modifies
 ├── section/                     # Completed specifications (promoted)
 │   └── <slug>.md
-└── archive/                     # Archived design/implementation for completed/abandoned proposals
-    └── <slug>/
-        ├── design.md
-        └── implementation.md
+├── archive/                     # Archived design/implementation for completed/abandoned proposals
+│   └── <slug>/
+│       ├── design.md
+│       ├── implementation.md
+│       └── .abandoned           # Marker file if proposal was abandoned
+└── maintenance/                 # Recurring operational tasks
+    └── <slug>.md                # Maintenance items with requirements
 ```
 
-## MCP Tools
+## MCP Tools Available
 
-Use these MCP tools to access specification information:
+### Project Context Tools
 
-| Tool            | Description                                                                 |
-|-----------------|-----------------------------------------------------------------------------|
-| `context`       | Get project rules, design, and active proposal's spec + design docs         |
-| `tasks`         | Get current phase tasks with IDs (e.g., "1.1", "1.2") - shows first incomplete phase only |
-| `task_complete` | Mark a task complete by ID (e.g., `task_complete(id: "1.1")`)               |
-| `docs_list`     | List all available third-party documentation components                     |
-| `docs_search`   | Search documentation by name - returns full content of matches              |
+| Tool                    | Description                                                                 |
+|-------------------------|-----------------------------------------------------------------------------|
+| `context`               | Get project rules, design, and active proposal's spec + design docs. Returns integrity warnings if proposal files changed since activation. |
+| `tasks`                 | Get current phase tasks with IDs (e.g., "1.1", "1.2") - shows first incomplete phase only |
+| `task_complete`         | Mark a task complete by ID (params: id: "1.1"). If git.auto_commit is enabled, automatically commits all changes. |
+| `task_snapshot`         | Create a git snapshot before starting work on a task (params: id: "1.1"). Only effective if git.auto_snapshot enabled in config. |
 
-## MCP Prompts
+### Documentation Tools
 
-Two implementation workflows are available:
+| Tool                    | Description                                                                 |
+|-------------------------|-----------------------------------------------------------------------------|
+| `docs_list`             | List all available third-party documentation components                     |
+| `docs_search`           | Search documentation by name - returns full content of matches (params: query: string) |
 
-| Prompt                 | Description                                                              |
-|------------------------|--------------------------------------------------------------------------|
-| `start-implementation` | **Methodical**: 5-phase process (investigate → plan tests → implement → validate → test). Fails fast - stops and asks user on any failure. |
-| `lazy`                 | **Fast**: Implements quickly, moves past blockers, documents incomplete items. Prioritizes progress over perfection. |
+### Maintenance Tools
+
+| Tool                    | Description                                                                 |
+|-------------------------|-----------------------------------------------------------------------------|
+| `maintenance_list`      | List all maintenance items with due/total requirement counts                |
+| `maintenance_context`   | Get requirements for a maintenance item, showing which are currently due (params: slug: string) |
+| `maintenance_actioned`  | Mark a requirement as actioned, records current timestamp (params: slug: string, id: string) |
+
+## MCP Prompts Available
+
+MCP prompts are guided workflows that help agents follow best practices:
+
+| Prompt                  | Description                                                                 | When to Use                |
+|-------------------------|-----------------------------------------------------------------------------|----------------------------|
+| `elaborate-spec`        | Guide comprehensive proposal elaboration with design, steps, phases, and dependencies. Asks user questions to ensure 98% confidence. | Before implementing a new proposal - ensures thorough planning |
+| `start-implementation`  | Methodical implementation: investigate → plan tests → implement → validate → test. Fail-fast with validation checkpoints. | For careful, production-ready implementation |
+| `lazy`                  | Fast autonomous implementation: implement quickly, move past blockers, document incomplete items | For rapid prototyping or proof-of-concept work |
+| `start-maintenance`     | Execute due requirements for a maintenance item (params: slug: string) | When maintenance items show due requirements |
+| `add-third-party-docs`  | Generate condensed library documentation for spec/third/ (params: urls: comma-separated URLs) | When adding new third-party dependencies |
+
+### Recommended Workflow
+
+1. **Planning Phase**: Use `elaborate-spec` to thoroughly design the proposal
+   - Agent asks which proposal to elaborate
+   - Gathers all requirements and dependencies
+   - Highlights missing third-party docs
+   - Creates comprehensive design.md and phased implementation.md
+   
+2. **Implementation Phase**: Use `start-implementation` or `lazy` 
+   - Agent reads context and tasks
+   - Works through phased implementation
+   - Marks tasks complete automatically
+
+3. **Maintenance**: Use `start-maintenance` for recurring tasks
+   - Agent executes all due requirements
+   - Marks items as actioned with timestamps
+
+## Maintenance Requirements Format
+
+Maintenance files use a special format with frequency tags:
+
+```markdown
+## Requirements
+
+- [id=dep-update] [freq=weekly] Update npm dependencies
+- [id=security-audit] [freq=monthly] Run security audit
+- [id=backup-check] [freq=daily] Verify backup completion
+- [id=onetime-task] Setup CI/CD pipeline
+```
+
+**Frequency values**: `daily`, `weekly`, `biweekly`, `monthly`, `quarterly`, `yearly`, or omit `[freq=...]` for always-due.
+
+## Proposal Dependencies
+
+Proposals can declare dependencies in their specification.md using:
+
+```markdown
+**Dependencies**: proposal-slug-1, proposal-slug-2
+```
+
+Dependencies must exist as completed specifications in `spec/section/` before a proposal can be activated.
 
 ## Rules for Agents
 
@@ -67,3 +136,24 @@ Two implementation workflows are available:
 4. **Track progress**: Use `tasks` to see current work, `task_complete` to mark done
 5. **Update internal todo**: Keep your own task list in sync with Nocturnal tasks
 6. **Respect integrity warnings**: If `context` returns an integrity warning about changed files, STOP and ask user to confirm
+7. **Use task_snapshot**: If git integration is enabled, create snapshots before starting tasks
+8. **Commit semantically**: If git.auto_commit is enabled, task completion automatically commits with task description
+9. **Check maintenance**: Use `maintenance_list` to see if any recurring tasks are due
+10. **Search docs first**: Before asking about third-party APIs, use `docs_search` to check available documentation
+
+## Best Practices
+
+- **Specification-first**: Specifications should be human-led. If a user asks you to write or improve specs, remind them that specs define requirements and should be their responsibility.
+- **Design documentation**: Capture architectural decisions in design.md, including options considered and trade-offs.
+- **Phase-based implementation**: Break work into logical phases with clear milestones.
+- **Dependencies**: Declare dependencies in specification.md to ensure proper ordering.
+- **Third-party docs**: Add condensed API documentation to spec/third/ for libraries you frequently reference.
+- **Maintenance cadence**: Set appropriate frequencies for recurring tasks (daily for critical checks, quarterly for reviews).
+
+## Common Issues
+
+- **No active proposal**: Many MCP tools require an active proposal - user must activate one first
+- **Integrity warnings**: If proposal files changed since activation, user must re-activate or confirm to proceed
+- **Missing dependencies**: Proposals with unmet dependencies cannot be activated
+- **Duplicate IDs**: Maintenance requirement IDs must be unique within a file
+- **Invalid frequency**: Only allowed values are daily, weekly, biweekly, monthly, quarterly, yearly

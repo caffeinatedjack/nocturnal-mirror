@@ -79,6 +79,8 @@ Provides a structured workspace with proposals (spec + design + implementation),
 │  └── maintenance_actioned    Mark maintenance requirement as done           │
 │                                                                             │
 │  Prompts (implementation workflows)                                         │
+│  ├── elaborate-spec          Guide comprehensive proposal elaboration with  │
+│  │                           design, steps, phases, and dependencies        │
 │  ├── start-implementation    Methodical: investigate → plan tests →         │
 │  │                           implement → validate → test (fail-fast)        │
 │  ├── lazy                    Fast: implement quickly, move past blockers,   │

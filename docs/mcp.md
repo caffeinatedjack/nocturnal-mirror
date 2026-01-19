@@ -72,6 +72,28 @@ Records current timestamp and resets the frequency counter for due date calculat
 
 ## Exposed Prompts
 
+### `elaborate-spec`
+
+Guides comprehensive elaboration of a proposal specification with a thorough 9-step process:
+
+1. **Identify the Proposal** - Asks user which proposal to elaborate on
+2. **Gather Requirements** - Functional requirements, technical constraints, dependencies
+3. **Third-Party Documentation Check** - Verifies docs exist, highlights missing ones using `docs_search`
+4. **Design Elaboration** - Architecture, components, technical decisions, testing strategy
+5. **Implementation Planning** - Creates phased approach with specific, actionable tasks
+6. **Specification Update** - Ensures proper RFC 2119 requirements, success criteria, scope
+7. **Dependency Documentation** - Documents proposal, third-party, and system dependencies
+8. **Validation** - 8-point checklist before finalizing
+9. **Summary** - Presents overview with readiness assessment
+
+Philosophy:
+- **98% confidence threshold** - Agent must ask user if not highly confident about any aspect
+- **Comprehensive documentation** - Detailed enough for any developer to implement
+- **Dependency awareness** - Explicitly asks about and documents all dependencies
+- **Third-party documentation** - Highlights missing docs and suggests using `add-third-party-docs`
+
+Use this prompt BEFORE implementation to ensure the proposal is thoroughly designed and planned.
+
 ### `start-implementation`
 
 A methodical, fail-fast implementation approach with multiple validation checkpoints. Each task goes through 5 phases, each run as a separate subagent:

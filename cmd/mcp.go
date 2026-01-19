@@ -55,6 +55,7 @@ func runMCP(cmd *cobra.Command, args []string) {
 
 	// Prompts
 	registerAddThirdPartyDocsPrompt(s)
+	registerElaborateSpecPrompt(s)
 	registerStartImplementationPrompt(s)
 	registerLazyPrompt(s)
 	registerStartMaintenancePrompt(s)
@@ -702,6 +703,221 @@ Documentation URLs to process:
 
 		return &mcp.GetPromptResult{
 			Description: "Instructions for creating condensed third-party documentation",
+			Messages: []mcp.PromptMessage{
+				{
+					Role: mcp.RoleUser,
+					Content: mcp.TextContent{
+						Type: "text",
+						Text: promptText,
+					},
+				},
+			},
+		}, nil
+	})
+}
+
+func registerElaborateSpecPrompt(s *server.MCPServer) {
+	prompt := mcp.NewPrompt("elaborate-spec",
+		mcp.WithPromptDescription("Elaborate on a proposal specification with comprehensive design, implementation steps, and dependency analysis"),
+	)
+
+	s.AddPrompt(prompt, func(ctx context.Context, request mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
+		promptText := `You will help elaborate on a specification proposal with comprehensive detail, ensuring all aspects are clearly defined before implementation begins.
+
+## Philosophy
+
+- **Thoroughness over speed**: Take time to think through all aspects
+- **Ask when uncertain**: If you're not at least 98% confident about any aspect, ASK the user
+- **Comprehensive documentation**: The proposal should be detailed enough that any developer can implement it
+- **Dependency awareness**: Identify all dependencies on other proposals and third-party libraries
+
+## Step 1: Identify the Proposal
+
+First, ask the user which proposal they want to elaborate on. You can help by listing available proposals from the spec/proposal/ directory.
+
+Once you know the proposal slug, read the existing files:
+- specification.md (if it exists)
+- design.md (if it exists)
+- implementation.md (if it exists)
+- Any other relevant files
+
+## Step 2: Gather Requirements
+
+Ask the user these questions (if not already clear from existing docs):
+
+### Functional Requirements
+- What is the primary goal of this proposal?
+- What are the key features or capabilities it should provide?
+- What are the acceptance criteria for completion?
+- Are there any MUST, SHOULD, and MAY requirements?
+
+### Technical Constraints
+- Are there specific technologies, libraries, or frameworks that must be used?
+- Are there performance requirements?
+- Are there compatibility requirements?
+- Are there security considerations?
+
+### Dependencies
+- Does this proposal depend on any OTHER proposals being completed first?
+- Which third-party libraries or APIs will be needed?
+- Are there any system dependencies?
+
+If any answers are unclear or missing, STOP and ask the user for clarification.
+
+## Step 3: Third-Party Documentation Check
+
+For each third-party library or API identified:
+1. Check if documentation already exists in spec/third/ using docs_search
+2. If missing, highlight to the user: "⚠️ Third-party documentation needed for: [library name]"
+3. Suggest that they add it using the add-third-party-docs prompt
+
+Do NOT proceed with design until critical third-party docs are available (or user confirms to proceed anyway).
+
+## Step 4: Design Elaboration
+
+Create or update the design.md file with these sections:
+
+### Architecture Overview
+- High-level architecture diagram (in text/ASCII if needed)
+- Component breakdown
+- Data flow between components
+- Integration points with existing system
+
+### Component Design
+For each major component:
+- Purpose and responsibilities
+- Interface/API design
+- Data structures
+- Error handling approach
+- Edge cases to consider
+
+### Technical Decisions
+- Key design decisions and rationale
+- Alternative approaches considered and why they were rejected
+- Trade-offs made
+
+### Testing Strategy
+- Unit test requirements
+- Integration test requirements
+- Manual testing scenarios
+- Performance testing approach (if applicable)
+
+If you're not 98% confident about any design decision, ask the user before documenting it.
+
+## Step 5: Implementation Planning
+
+Create or update the implementation.md file with a phased approach:
+
+### Phase Structure
+
+Each phase should have:
+- **Phase N: [Name]**
+- **Goal**: Clear objective for this phase
+- **Tasks**: Specific, actionable checkboxes
+  - [ ] Task ID will be auto-assigned (phase.task format like 1.1, 1.2)
+  - Each task should be small enough to complete in one sitting
+  - Each task should have clear completion criteria
+- **Milestone**: What will be delivered when this phase completes
+
+### Phase Breakdown Guidelines
+
+- Phase 1: Setup and foundations (project structure, base files, dependencies)
+- Phase 2-N: Feature implementation (one major feature or component per phase)
+- Final Phase: Testing, documentation, and polish
+
+### Task Granularity
+
+Good task examples:
+- [ ] Create base User model with email and password fields
+- [ ] Implement email validation with regex pattern
+- [ ] Add password hashing using bcrypt
+- [ ] Write unit tests for User model validation
+
+Bad task examples (too vague):
+- [ ] Implement user system
+- [ ] Add authentication
+- [ ] Make it work
+
+## Step 6: Specification Update
+
+Update specification.md to ensure it includes:
+
+### Overview
+- What: Brief description of what this proposal does
+- Why: Business or technical justification
+- Who: Target users or affected systems
+
+### Requirements
+Use RFC 2119 keywords:
+- **MUST**: Absolute requirements
+- **MUST NOT**: Absolute prohibitions
+- **SHOULD**: Recommended but not required
+- **SHOULD NOT**: Not recommended but not prohibited
+- **MAY**: Truly optional
+
+### Success Criteria
+Clear, measurable criteria for when this proposal is "done"
+
+### Out of Scope
+Explicitly state what this proposal will NOT do (to prevent scope creep)
+
+## Step 7: Dependency Documentation
+
+Create or update a DEPENDENCIES section in specification.md:
+
+### Proposal Dependencies
+List any other proposals that must be completed first:
+- [proposal-slug]: Brief description of why it's needed
+
+### Third-Party Dependencies
+List all third-party libraries, frameworks, or services:
+- [library/service name] (version if known): Purpose and usage
+
+### System Dependencies
+Any OS, runtime, or infrastructure requirements
+
+## Step 8: Validation
+
+Before finalizing, verify:
+
+- [ ] All user questions have been answered
+- [ ] No design decisions have <98% confidence
+- [ ] All required third-party docs are available or flagged
+- [ ] Proposal dependencies are clearly documented
+- [ ] Implementation phases are logical and complete
+- [ ] Each task is specific and actionable
+- [ ] Success criteria are measurable
+- [ ] Out of scope is clearly defined
+
+If any checkbox is unchecked, address it before completing.
+
+## Step 9: Summary
+
+Present to the user:
+
+1. **Proposal**: [slug]
+2. **Overview**: [1-2 sentence summary]
+3. **Dependencies**:
+   - Proposals: [list or "none"]
+   - Third-party: [list or "none"]
+   - Missing docs: [list or "none"]
+4. **Phases**: [count] phases with [total] tasks
+5. **Estimated complexity**: [Low/Medium/High]
+6. **Ready for implementation**: [Yes/No - if no, explain what's missing]
+
+Ask the user if they want to proceed with implementation or if they'd like to revise any aspects.
+
+## Important Notes
+
+- Use docs_search to check for existing third-party documentation
+- Read existing project rules and design with context tool if needed
+- Always ask about proposal dependencies - don't assume independence
+- Document assumptions clearly if user confirms to proceed with uncertainty
+- The goal is a specification so complete that implementation is straightforward
+`
+
+		return &mcp.GetPromptResult{
+			Description: "Elaborate on a proposal specification with comprehensive design and implementation planning",
 			Messages: []mcp.PromptMessage{
 				{
 					Role: mcp.RoleUser,
