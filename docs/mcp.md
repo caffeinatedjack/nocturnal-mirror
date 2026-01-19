@@ -33,6 +33,10 @@ Behavior notes:
 
 Marks a task complete by ID (e.g. `task_complete(id: "1.1")`) by updating the checkbox in `implementation.md`.
 
+### `task_snapshot`
+
+Creates a git snapshot before starting work on a task (if git integration is enabled in config).
+
 ### `docs_list`
 
 Lists documentation components found in `spec/third/`.
@@ -40,6 +44,31 @@ Lists documentation components found in `spec/third/`.
 ### `docs_search`
 
 Searches documentation components by name and returns full matching content.
+
+### `maintenance_list`
+
+Lists all maintenance items with due/total requirement counts.
+
+Returns items showing how many requirements are currently due based on frequency and last-actioned time.
+
+### `maintenance_context`
+
+Gets requirements for a specific maintenance item, showing which are currently due.
+
+Parameters:
+- `slug` - Maintenance item slug
+
+Returns full file content with parsed requirements, due status, and instructions for marking items as actioned.
+
+### `maintenance_actioned`
+
+Marks a maintenance requirement as completed.
+
+Parameters:
+- `slug` - Maintenance item slug
+- `id` - Requirement ID
+
+Records current timestamp and resets the frequency counter for due date calculation.
 
 ## Exposed Prompts
 
@@ -57,10 +86,6 @@ If any phase fails, the agent stops and asks the user for guidance on next steps
 
 Accepts an optional `goal` argument.
 
-### `add-third-party-docs`
-
-Instructions for generating condensed third-party docs and saving them into `spec/third/`.
-
 ### `lazy`
 
 A fast, autonomous implementation loop that prioritizes speed over perfection:
@@ -74,6 +99,29 @@ A fast, autonomous implementation loop that prioritizes speed over perfection:
 Philosophy: Get working code quickly, document what's incomplete, let the user decide on follow-up.
 
 Accepts an optional `goal` argument.
+
+### `start-maintenance`
+
+Guides an agent through executing all due requirements for a maintenance item.
+
+Parameters:
+- `slug` - Maintenance item slug
+
+Workflow:
+1. Agent calls `maintenance_context` to get due requirements
+2. For each due requirement:
+   - Analyze what needs to be done
+   - Execute the task (update dependencies, run audits, etc.)
+   - Verify completion
+   - Call `maintenance_actioned(slug, id)` to mark as done
+3. Call `maintenance_context` again to confirm no requirements are still due
+4. Report summary to user
+
+The agent autonomously executes all due maintenance tasks, committing changes as appropriate.
+
+### `add-third-party-docs`
+
+Instructions for generating condensed third-party docs and saving them into `spec/third/`.
 
 ## Configuration
 

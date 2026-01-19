@@ -33,6 +33,9 @@ Active proposals are tracked in `spec/.nocturnal.json`. When activated, file has
 ### Rules
 Project-wide constraints and guidelines that persist across all proposals. Rules define coding standards, architectural patterns, or business constraints.
 
+### Maintenance
+Recurring operational tasks with frequency-based tracking. Maintenance items contain requirements that are marked as due based on their frequency (daily, weekly, monthly, etc.) and last-actioned timestamp. Examples include dependency updates, security audits, and periodic reviews.
+
 ### Archive
 Completed proposals are archived - their design and implementation documents are preserved for reference, while specifications are promoted to the main section.
 
@@ -40,6 +43,7 @@ Completed proposals are archived - their design and implementation documents are
 
 - **[Specification Management](./proposal.md)** - Create and manage proposals through their lifecycle
 - **[Rules Management](./rule.md)** - Define project-wide guidelines and constraints
+- **[Maintenance Management](./maintenance.md)** - Track recurring operational tasks with frequency-based due dates
 - **[MCP Server](./mcp.md)** - Expose tools to AI assistants via Model Context Protocol
 - **[Documentation Management](./docs.md)** - Store and search API/library documentation
 
