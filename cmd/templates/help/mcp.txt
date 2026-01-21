@@ -17,6 +17,7 @@ Exposed prompts:
     add-third-party-docs    Generate condensed documentation for third-party libraries
     lazy                    Fast autonomous implementation - moves past blockers quickly
     start-maintenance       Execute maintenance requirements for a maintenance item
+    populate-spec-sections  Write comprehensive specifications for all features of a new project
 
 Example:
     nocturnal mcp

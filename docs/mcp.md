@@ -165,6 +165,33 @@ The agent autonomously executes all due maintenance tasks, committing changes as
 
 Instructions for generating condensed third-party docs and saving them into `spec/third/`.
 
+### `populate-spec-sections`
+
+A comprehensive guide for writing complete specification sections for a new project. This prompt helps AI agents create full, RFC-formatted specifications for all features.
+
+**Workflow:**
+
+1. **Understand the Project** - Gather high-level description, feature areas, technologies, and constraints
+2. **Identify Specification Sections** - Propose logical groupings of features (e.g., "authentication", "API", "workflows")
+3. **For Each Section**:
+   - Gather detailed functional and technical requirements through questions
+   - Write comprehensive spec following IETF RFC format with numbered sections
+   - Include: Introduction, Requirements Notation, Terminology, Concepts, Core Technical Sections, Examples, Security Considerations, Error Handling
+   - Validate completeness before moving to next section
+4. **Cross-Reference Check** - Review all specs for inconsistencies, missing dependencies, gaps
+5. **Final Validation** - Present summary with coverage assessment and readiness check
+
+**Philosophy:**
+- **Complete specifications** - Every feature, API, behavior, and constraint documented
+- **RFC format** - IETF RFC/Internet-Draft structure with normative language (MUST/SHOULD/MAY)
+- **Ask questions** - When clarification needed about features or technical details
+- **Technical rigor** - Precise, unambiguous, and testable requirements
+- **One spec per domain** - Group related functionality into logical documents
+
+**Output:** Creates markdown files in `spec/section/[section-slug].md` following the project's specification guidelines. These become the foundation for all development.
+
+Use this prompt when starting a new project to establish comprehensive specifications before creating any proposals or writing code.
+
 ## Configuration
 
 ### OpenCode

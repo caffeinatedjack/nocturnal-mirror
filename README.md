@@ -91,7 +91,8 @@ Provides a structured workspace with proposals (spec + design + implementation),
 │  ├── lazy                    Fast: implement quickly, move past blockers,   │
 │  │                           document incomplete items                      │
 │  ├── start-maintenance       Execute due requirements for maintenance item  │
-│  └── add-third-party-docs    Generate condensed library documentation       │
+│  ├── add-third-party-docs    Generate condensed library documentation       │
+│  └── populate-spec-sections  Write comprehensive specs for new project      │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
 

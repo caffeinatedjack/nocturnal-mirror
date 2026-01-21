@@ -82,16 +82,24 @@ task_complete(id="REQ-1", maintenance_slug="dependency-updates")  # Mark REQ-1 c
 
 MCP prompts are guided workflows that help agents follow best practices:
 
-| Prompt                  | Description                                                                 | When to Use                |
-|-------------------------|-----------------------------------------------------------------------------|----------------------------|
-| `elaborate-spec`        | Guide comprehensive proposal elaboration with design, steps, phases, and dependencies. Asks user questions to ensure 98% confidence. | Before implementing a new proposal - ensures thorough planning |
-| `start-implementation`  | Methodical implementation: investigate → plan tests → implement → validate → test. Fail-fast with validation checkpoints. | For careful, production-ready implementation |
-| `lazy`                  | Fast autonomous implementation: implement quickly, move past blockers, document incomplete items | For rapid prototyping or proof-of-concept work |
-| `start-maintenance`     | Execute due requirements for a maintenance item (params: slug: string) | When maintenance items show due requirements |
-| `add-third-party-docs`  | Generate condensed library documentation for spec/third/ (params: urls: comma-separated URLs) | When adding new third-party dependencies |
+| Prompt                    | Description                                                                 | When to Use                |
+|---------------------------|-----------------------------------------------------------------------------|----------------------------|
+| `elaborate-spec`          | Guide comprehensive proposal elaboration with design, steps, phases, and dependencies. Asks user questions to ensure 98% confidence. | Before implementing a new proposal - ensures thorough planning |
+| `start-implementation`    | Methodical implementation: investigate → plan tests → implement → validate → test. Fail-fast with validation checkpoints. | For careful, production-ready implementation |
+| `lazy`                    | Fast autonomous implementation: implement quickly, move past blockers, document incomplete items | For rapid prototyping or proof-of-concept work |
+| `start-maintenance`       | Execute due requirements for a maintenance item (params: slug: string) | When maintenance items show due requirements |
+| `add-third-party-docs`    | Generate condensed library documentation for spec/third/ (params: urls: comma-separated URLs) | When adding new third-party dependencies |
+| `populate-spec-sections`  | Write comprehensive specifications for all features of a new project following IETF RFC format | When starting a new project - before creating any proposals |
 
 ### Recommended Workflow
 
+**For New Projects**:
+1. **Initial Specification**: Use `populate-spec-sections` to write comprehensive specifications for all features
+   - Agent asks about project description and feature areas
+   - Creates complete spec sections in `spec/section/` following RFC format
+   - Establishes foundation before any implementation
+
+**For Feature Development**:
 1. **Planning Phase**: Use `elaborate-spec` to thoroughly design the proposal
    - Agent asks which proposal to elaborate
    - Gathers all requirements and dependencies

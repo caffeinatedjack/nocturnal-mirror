@@ -56,6 +56,7 @@ func runMCP(cmd *cobra.Command, args []string) {
 	registerStartImplementationPrompt(s)
 	registerLazyPrompt(s)
 	registerStartMaintenancePrompt(s)
+	registerPopulateSpecSectionsPrompt(s)
 
 	if err := server.ServeStdio(s); err != nil {
 		fmt.Fprintf(os.Stderr, "MCP server error: %v\n", err)
@@ -1593,6 +1594,323 @@ When all due requirements are actioned:
 
 		return &mcp.GetPromptResult{
 			Description: "Execute maintenance requirements",
+			Messages: []mcp.PromptMessage{
+				{
+					Role: mcp.RoleUser,
+					Content: mcp.TextContent{
+						Type: "text",
+						Text: promptText,
+					},
+				},
+			},
+		}, nil
+	})
+}
+
+func registerPopulateSpecSectionsPrompt(s *server.MCPServer) {
+	prompt := mcp.NewPrompt("populate-spec-sections",
+		mcp.WithPromptDescription("Guide comprehensive specification writing for all features of a new project, following IETF RFC format"),
+	)
+
+	s.AddPrompt(prompt, func(ctx context.Context, request mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
+		promptText := `You will help write comprehensive specification sections for a new project. These specs will be the foundation for all development, so they must be complete, clear, and follow the IETF RFC format.
+
+## Philosophy
+
+- **Complete specifications**: Every feature, API, behavior, and constraint must be documented
+- **RFC format**: Follow IETF RFC/Internet-Draft structure with numbered sections
+- **Normative language**: Use RFC 2119 keywords (MUST, SHOULD, MAY) for all requirements
+- **Ask questions**: When you need clarification about features, behavior, or technical details, ASK the user
+- **One spec per feature domain**: Group related functionality into logical specification documents
+- **Technical rigor**: Be precise, unambiguous, and testable
+
+## Step 1: Understand the Project
+
+First, gather information about the project:
+
+1. Ask the user for a high-level description of the project
+2. Ask about the major feature areas or domains (e.g., "authentication", "API", "workflows", "storage")
+3. Ask about key technologies, frameworks, or constraints
+4. Read any existing files in the spec/ directory to understand context:
+   - spec/project.md (if exists) - for project design overview
+   - spec/rule/*.md (if exists) - for project rules and constraints
+
+Document your understanding before proceeding.
+
+## Step 2: Identify Specification Sections
+
+Based on the project description, identify logical specification sections. Each section should:
+- Cover a cohesive feature domain or subsystem
+- Be independently understandable (though it can reference other sections)
+- Have clear boundaries and scope
+
+Present your proposed section list to the user:
+
+**Proposed Specification Sections:**
+1. **[section-slug]**: [Description of what this covers]
+2. **[section-slug]**: [Description]
+...
+
+Ask the user to confirm or modify this list before proceeding.
+
+## Step 3: For Each Specification Section
+
+Work through each section systematically. For EACH section:
+
+### 3.1. Gather Detailed Requirements
+
+Ask the user detailed questions about this specific section:
+
+**Functional Requirements:**
+- What are the core features/capabilities in this domain?
+- What are the primary use cases?
+- What are the inputs and outputs?
+- What are the success criteria?
+
+**Technical Requirements:**
+- What data models or structures are involved?
+- What APIs or interfaces must be defined?
+- What are the performance requirements?
+- What are the security considerations?
+- What error conditions must be handled?
+
+**Constraints and Dependencies:**
+- Are there limitations or constraints?
+- Does this depend on other sections?
+- Are there external dependencies (libraries, services)?
+
+**Examples:**
+- Ask for concrete examples of typical usage
+- Ask about edge cases or unusual scenarios
+
+If any answer is vague or unclear, ask follow-up questions until you have complete information.
+
+### 3.2. Write the Specification
+
+Create a markdown file at **spec/section/[section-slug].md** following this structure:
+
+#### Required Sections:
+
+**1. Introduction** (2-4 paragraphs)
+- Current state / context
+- Problem being solved or capability being added
+- Why existing approaches are insufficient (if applicable)
+- Brief overview of the solution approach
+
+**2. Requirements Notation** (if using RFC 2119 keywords)
+
+Include this standard text:
+"The key words 'MUST', 'MUST NOT', 'REQUIRED', 'SHALL', 'SHALL NOT', 'SHOULD', 
+'SHOULD NOT', 'RECOMMENDED', 'MAY', and 'OPTIONAL' in this document are to be 
+interpreted as described in RFC 2119."
+
+**3. Terminology** (if domain-specific terms are used)
+Define all terms used in the spec:
+- Format: **Term**: Definition
+- Include any ambiguous terms that need clarification
+
+**4. Concepts** (for complex features)
+Explain core concepts that underpin the specification:
+- Break down into numbered subsections (4.1, 4.2, etc.)
+- Use clear, accessible language
+- Include examples where helpful
+
+**5-N. Core Technical Sections**
+Structure based on the domain. Common patterns:
+- **Data Models**: Schema definitions, types, constraints
+- **API Specification**: Endpoints, request/response formats, parameters
+- **Behaviors**: Expected system behaviors, state transitions
+- **Algorithms**: Step-by-step processing logic
+
+For each technical element, specify:
+- Required vs optional (MUST/MAY/SHOULD)
+- Data types and formats
+- Valid ranges or values
+- Default behaviors
+- Error conditions
+
+**Examples Section** (highly recommended)
+- Provide concrete, realistic examples
+- Show both typical cases AND edge cases
+- Include complete request/response cycles
+- Format code blocks clearly
+
+**Security Considerations** (required)
+Identify ALL security implications:
+- Authentication/authorization impacts
+- Data exposure risks
+- Injection vulnerabilities
+- Rate limiting/DoS concerns
+- Cryptographic requirements
+
+**Error Handling** (required for API/protocol specs)
+- Define all error conditions
+- Specify error codes/types
+- Describe expected error responses
+- Document recovery procedures
+
+**Migration/Upgrade Path** (if applicable)
+- Backward compatibility strategy
+- Migration steps for existing data/code
+- Deprecation timeline if applicable
+
+**References** (if citing external sources)
+Split into:
+- **Normative References**: Specifications that MUST be consulted
+- **Informative References**: Helpful background reading
+
+Format: [ShortName] Author, "Title", Date, URL
+
+### 3.3. Validate Completeness
+
+Before moving to the next section, verify:
+
+- [ ] All features in this domain are covered
+- [ ] All requirements use normative language (MUST/SHOULD/MAY)
+- [ ] Every requirement is testable and unambiguous
+- [ ] Examples are provided for complex behaviors
+- [ ] Security and error handling are addressed
+- [ ] Section numbering is correct
+- [ ] All terms are defined
+- [ ] No implementation details (save those for design docs later)
+
+Show the user a summary and ask for confirmation before proceeding to the next section.
+
+## Step 4: Cross-Reference Check
+
+After all sections are written:
+
+1. Review all specifications for:
+   - Inconsistencies between sections
+   - Missing dependencies between features
+   - Gaps in coverage
+   - Overlapping or conflicting requirements
+
+2. Update sections as needed to add cross-references:
+   - Format: "See Section [N] of [other-spec.md] for details on..."
+   - Add "Depends on: [section-slug]" at the top of dependent sections
+
+3. Present a dependency map to the user showing how sections relate
+
+## Step 5: Final Validation
+
+Present a final summary:
+
+**Specification Sections Created:**
+1. **[section-slug]** ([N] requirements, [N] MUSTs, [N] SHOULDs)
+   - [Brief description]
+   - Dependencies: [list or "none"]
+
+2. **[section-slug]** ...
+
+**Coverage Assessment:**
+- [ ] All major features specified
+- [ ] All security considerations addressed
+- [ ] All error conditions defined
+- [ ] All data models documented
+- [ ] All APIs/interfaces defined
+- [ ] Examples provided throughout
+
+**Next Steps:**
+The specifications are now complete and ready to serve as the foundation for:
+- Creating proposals for individual features (nocturnal spec proposal add)
+- Writing design documents that detail implementation approaches
+- Developing the actual code based on these requirements
+
+## Writing Style Requirements
+
+Throughout all sections:
+
+1. **Precision**: Use exact, unambiguous language
+2. **Active Voice**: "The system MUST validate..." not "Validation must be performed..."
+3. **Present Tense**: "returns" not "will return"
+4. **Structured Lists**: Use bullet points or numbered lists for multiple items
+5. **Consistency**: Use the same term for the same concept throughout all sections
+6. **Technical Objectivity**: Avoid marketing language, keep it technical
+
+## Important Notes
+
+- Focus on WHAT the system must do and WHY, not HOW it will be implemented
+- Every MUST/SHOULD statement must be testable
+- State all prerequisites and assumptions explicitly
+- If you're uncertain about any aspect, ask the user - don't guess
+- Read the specification guidelines from spec/project.md or ask the user if the format should differ
+- These specifications will be referenced constantly during development, so completeness is critical
+
+## File Naming Convention
+
+Specification files should be named descriptively:
+- Use kebab-case: lowercase with hyphens
+- Be specific: "user-authentication.md" not "auth.md"
+- Group related concepts: "api-conventions.md" for API-wide standards
+
+## Example Section Structure
+
+Here's an abbreviated example for reference:
+
+---
+# Feature Name Specification
+
+**Depends on**: other-spec (if applicable)
+
+## 1. Introduction
+
+[Context, problem, solution overview - 2-4 paragraphs]
+
+## 2. Requirements Notation
+
+[RFC 2119 statement if using normative language]
+
+## 3. Terminology
+
+**Term**: Definition
+**Another Term**: Definition
+
+## 4. Concepts
+
+### 4.1. Core Concept
+
+[Explanation with examples]
+
+## 5. Requirements
+
+### 5.1. Requirement Category
+
+1. The system MUST...
+2. The system SHOULD...
+3. Optional features MAY...
+
+### 5.2. Another Category
+
+...
+
+## 6. Examples
+
+[Concrete examples with code blocks]
+
+## 7. Security Considerations
+
+[Security implications and requirements]
+
+## 8. Error Handling
+
+[Error conditions and responses]
+
+## 9. References
+
+### 9.1. Normative References
+
+[RFC-XXX] ...
+
+### 9.2. Informative References
+
+[Helpful] ...
+---
+
+Begin by understanding the project. Ask the user for the project description and feature areas.`
+
+		return &mcp.GetPromptResult{
+			Description: "Guide comprehensive specification writing for a new project",
 			Messages: []mcp.PromptMessage{
 				{
 					Role: mcp.RoleUser,
