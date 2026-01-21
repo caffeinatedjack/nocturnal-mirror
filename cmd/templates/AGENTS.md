@@ -50,26 +50,33 @@ spec/
 
 ## MCP Tools Available
 
-### Project Context Tools
+All MCP tools are unified - use optional parameters to switch between proposal and maintenance contexts.
 
-| Tool                    | Description                                                                 |
-|-------------------------|-----------------------------------------------------------------------------|
-| `context`               | Get project rules, design, and active proposal's spec + design docs. For maintenance, pass maintenance_slug parameter. Returns integrity warnings if proposal files changed since activation. |
-| `tasks`                 | Get current phase tasks with IDs (e.g., "1.1", "1.2") for proposals (shows first incomplete phase only), or maintenance requirements (pass maintenance_slug parameter). |
-| `task_complete`         | Mark a task complete by ID (params: id: "1.1"). For maintenance, also pass maintenance_slug. If git.auto_commit is enabled, automatically commits all changes. |
+| Tool                | Description                                                                 | Parameters |
+|---------------------|-----------------------------------------------------------------------------|------------|
+| `context`           | Get project rules, design, and active proposal/maintenance context. Returns integrity warnings if proposal files changed. | `maintenance_slug` (optional): pass maintenance slug for maintenance context instead of proposal |
+| `tasks`             | Get current phase tasks or maintenance requirements. For proposals, shows first incomplete phase only. | `maintenance_slug` (optional): pass maintenance slug for maintenance tasks |
+| `task_complete`     | Mark a task/requirement as complete. If git.auto_commit is enabled, automatically commits changes. | `id` (required): task ID like "1.1" or requirement ID<br>`maintenance_slug` (optional): required for maintenance items |
+| `docs_list`         | List all available third-party documentation components | None |
+| `docs_search`       | Search documentation by name - returns full content of matches | `query` (required): search term |
+| `maintenance_list`  | List all maintenance items with due/total requirement counts | None |
 
-### Documentation Tools
+### Usage Examples
 
-| Tool                    | Description                                                                 |
-|-------------------------|-----------------------------------------------------------------------------|
-| `docs_list`             | List all available third-party documentation components                     |
-| `docs_search`           | Search documentation by name - returns full content of matches (params: query: string) |
+**Proposal workflow:**
+```
+context()                          # Get active proposal context
+tasks()                            # Get current phase tasks
+task_complete(id="1.1")            # Mark task 1.1 complete
+```
 
-### Maintenance Tools
-
-| Tool                    | Description                                                                 |
-|-------------------------|-----------------------------------------------------------------------------|
-| `maintenance_list`      | List all maintenance items with due/total requirement counts                |
+**Maintenance workflow:**
+```
+maintenance_list()                                 # See all maintenance items
+context(maintenance_slug="dependency-updates")     # Get requirements for dependency-updates
+tasks(maintenance_slug="dependency-updates")       # Get due requirements
+task_complete(id="REQ-1", maintenance_slug="dependency-updates")  # Mark REQ-1 complete
+```
 
 ## MCP Prompts Available
 

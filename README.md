@@ -73,15 +73,15 @@ Provides a structured workspace with proposals (spec + design + implementation),
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
 │  Tools (callable by AI agents)                                              │
-│  ├── context                 Get rules, project design, active proposal     │
-│  ├── tasks                   Get current phase tasks with IDs               │
-│  ├── task_complete           Mark task done by ID (e.g., "1.1")             │
-│  ├── task_snapshot           Create git snapshot before starting task       │
+│  ├── context                 Get rules, design, active proposal/maintenance │
+│  │                           (use maintenance_slug param for maintenance)   │
+│  ├── tasks                   Get current phase tasks or maintenance reqs    │
+│  │                           (use maintenance_slug param for maintenance)   │
+│  ├── task_complete           Mark task/requirement done by ID               │
+│  │                           (use maintenance_slug param for maintenance)   │
 │  ├── docs_list               List documentation components                  │
 │  ├── docs_search             Search documentation by name                   │
-│  ├── maintenance_list        List maintenance items with due counts         │
-│  ├── maintenance_context     Get requirements for maintenance item          │
-│  └── maintenance_actioned    Mark maintenance requirement as done           │
+│  └── maintenance_list        List maintenance items with due counts         │
 │                                                                             │
 │  Prompts (implementation workflows)                                         │
 │  ├── elaborate-spec          Guide comprehensive proposal elaboration with  │

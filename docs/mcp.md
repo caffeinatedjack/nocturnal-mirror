@@ -8,6 +8,8 @@ The MCP server runs via standard input/output (stdio), making it easy to integra
 
 It exposes **tools** for reading project/proposal context, tracking phased tasks, and marking tasks complete; and **prompts** that guide an agent through either a normal implementation flow or an autonomous loop.
 
+**Note**: All MCP tools are unified - optional parameters allow switching between proposal and maintenance contexts.
+
 ## Exposed Tools
 
 ### `context`
@@ -16,26 +18,60 @@ Returns:
 - Project rules (`spec/rule/*.md`)
 - Project design (`spec/project.md`)
 - Active proposal documents: `specification.md` and `design.md`
+- OR maintenance item requirements (when `maintenance_slug` parameter is provided)
+
+**Parameters**:
+- `maintenance_slug` (optional): Pass a maintenance item slug to get maintenance context instead of proposal context
 
 Behavior notes:
 - Performs a proposal integrity check using file hashes captured at activation. If proposal files changed since activation, it returns a warning and the agent should stop until the user confirms.
 - May also include an "Affected Files" section (file contents) if enabled in `spec/nocturnal.yaml`.
 
+**Examples**:
+```
+context()                                    # Get active proposal context
+context(maintenance_slug="dependencies")     # Get maintenance item context
+```
+
 ### `tasks`
 
-Returns the **current phase** from the active proposal's `implementation.md`.
+Returns the **current phase** from the active proposal's `implementation.md`, or due maintenance requirements.
+
+**Parameters**:
+- `maintenance_slug` (optional): Pass a maintenance item slug to get maintenance tasks instead of proposal tasks
 
 Behavior notes:
-- Only the **first incomplete phase** is returned.
-- Tasks get IDs like `1.1`, `1.2`, `2.1` based on their phase number and order within the phase.
+- For proposals: Only the **first incomplete phase** is returned.
+- For proposals: Tasks get IDs like `1.1`, `1.2`, `2.1` based on their phase number and order within the phase.
+- For maintenance: Returns all requirements that are currently due based on frequency and last-actioned time.
+
+**Examples**:
+```
+tasks()                                      # Get current proposal phase tasks
+tasks(maintenance_slug="dependencies")       # Get due maintenance requirements
+```
 
 ### `task_complete`
 
-Marks a task complete by ID (e.g. `task_complete(id: "1.1")`) by updating the checkbox in `implementation.md`.
+Marks a task or maintenance requirement as complete.
 
-### `task_snapshot`
+**Parameters**:
+- `id` (required): Task ID (e.g., "1.1") or requirement ID
+- `maintenance_slug` (optional): Required when marking maintenance requirements as actioned
 
-Creates a git snapshot before starting work on a task (if git integration is enabled in config).
+For proposals:
+- Updates the checkbox in `implementation.md`
+- If `git.auto_commit` is enabled, automatically commits all changes
+
+For maintenance:
+- Records current timestamp
+- Resets the frequency counter for due date calculation
+
+**Examples**:
+```
+task_complete(id="1.1")                                          # Mark proposal task complete
+task_complete(id="REQ-1", maintenance_slug="dependencies")       # Mark maintenance requirement actioned
+```
 
 ### `docs_list`
 
@@ -45,30 +81,14 @@ Lists documentation components found in `spec/third/`.
 
 Searches documentation components by name and returns full matching content.
 
+**Parameters**:
+- `query` (required): Search term to match against component names
+
 ### `maintenance_list`
 
 Lists all maintenance items with due/total requirement counts.
 
 Returns items showing how many requirements are currently due based on frequency and last-actioned time.
-
-### `maintenance_context`
-
-Gets requirements for a specific maintenance item, showing which are currently due.
-
-Parameters:
-- `slug` - Maintenance item slug
-
-Returns full file content with parsed requirements, due status, and instructions for marking items as actioned.
-
-### `maintenance_actioned`
-
-Marks a maintenance requirement as completed.
-
-Parameters:
-- `slug` - Maintenance item slug
-- `id` - Requirement ID
-
-Records current timestamp and resets the frequency counter for due date calculation.
 
 ## Exposed Prompts
 
@@ -130,13 +150,13 @@ Parameters:
 - `slug` - Maintenance item slug
 
 Workflow:
-1. Agent calls `maintenance_context` to get due requirements
+1. Agent calls `context(maintenance_slug=slug)` to get due requirements
 2. For each due requirement:
    - Analyze what needs to be done
    - Execute the task (update dependencies, run audits, etc.)
    - Verify completion
-   - Call `maintenance_actioned(slug, id)` to mark as done
-3. Call `maintenance_context` again to confirm no requirements are still due
+   - Call `task_complete(id, maintenance_slug=slug)` to mark as done
+3. Call `context(maintenance_slug=slug)` again to confirm no requirements are still due
 4. Report summary to user
 
 The agent autonomously executes all due maintenance tasks, committing changes as appropriate.
