@@ -226,3 +226,96 @@ Add to Cursor's MCP settings (unverified):
   }
 }
 ```
+
+### VS Code with GitHub Copilot
+
+GitHub Copilot in VS Code supports MCP servers. To configure:
+
+1. **Install Prerequisites**:
+   - VS Code (latest version)
+   - GitHub Copilot extension
+   - Nocturnal CLI installed and in PATH
+
+2. **Configure MCP Settings**:
+
+Create or edit your VS Code settings file (`.vscode/settings.json` in your project, or user settings):
+
+```json
+{
+  "github.copilot.advanced": {
+    "mcp": {
+      "servers": {
+        "nocturnal": {
+          "command": "nocturnal",
+          "args": ["mcp"],
+          "cwd": "${workspaceFolder}"
+        }
+      }
+    }
+  }
+}
+```
+
+**Notes:**
+- `${workspaceFolder}` automatically uses your current project directory
+- Make sure `nocturnal` is in your PATH (e.g., `~/.local/bin/nocturnal`)
+- You may need to reload VS Code after adding the configuration
+- Check VS Code's Output panel (GitHub Copilot Chat) for MCP connection status
+
+3. **Verify Connection**:
+
+In the GitHub Copilot Chat, you can verify the MCP tools are available:
+- Ask Copilot: "@workspace What nocturnal tools are available?"
+- The tools (`context`, `tasks`, `task_complete`, etc.) should be listed
+
+4. **Using Prompts with Copilot**:
+
+To use the MCP prompts (like `populate-spec-sections` or `elaborate-spec`):
+- Ask Copilot: "Use the populate-spec-sections prompt to help me write specs"
+- Or: "Use the elaborate-spec prompt for the authentication proposal"
+
+**Per-Project Configuration:**
+
+For project-specific setup, create `.vscode/settings.json` in your project root:
+
+```json
+{
+  "github.copilot.advanced": {
+    "mcp": {
+      "servers": {
+        "nocturnal": {
+          "command": "/home/youruser/.local/bin/nocturnal",
+          "args": ["mcp"],
+          "cwd": "${workspaceFolder}"
+        }
+      }
+    }
+  }
+}
+```
+
+This ensures the MCP server always runs in the correct directory where your `spec/` workspace is located.
+
+## Troubleshooting
+
+### MCP Server Not Found
+
+If the AI assistant can't find the MCP server:
+- Verify `nocturnal` is installed: `which nocturnal`
+- Use absolute path in configuration: `/home/user/.local/bin/nocturnal`
+- Check that you're in a directory with a `spec/` workspace
+- Restart the AI assistant/editor after configuration changes
+
+### Tools Not Working
+
+If tools are connected but not working:
+- Ensure you're in the project root (where `spec/` directory exists)
+- Run `nocturnal spec init` if `spec/` doesn't exist yet
+- Check for errors in the MCP server logs (usually in the AI assistant's output panel)
+
+### Wrong Project Context
+
+If the MCP server is loading the wrong project:
+- Verify the `cwd` setting points to the correct project directory
+- For VS Code: ensure `${workspaceFolder}` resolves correctly
+- Start the editor/assistant from the correct project directory

@@ -223,6 +223,49 @@ make install
 # Binary will be installed to ~/.local/bin/nocturnal
 ```
 
+## MCP Integration Setup
+
+Nocturnal exposes its functionality via Model Context Protocol (MCP), allowing AI assistants to access your project context.
+
+### OpenCode
+
+Add to `~/.opencode/config.json`:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "nocturnal": {
+      "type": "local",
+      "enabled": true,
+      "command": ["nocturnal", "mcp"]
+    }
+  }
+}
+```
+
+### VS Code with GitHub Copilot
+
+Add to `.vscode/settings.json` in your project:
+
+```json
+{
+  "github.copilot.advanced": {
+    "mcp": {
+      "servers": {
+        "nocturnal": {
+          "command": "nocturnal",
+          "args": ["mcp"],
+          "cwd": "${workspaceFolder}"
+        }
+      }
+    }
+  }
+}
+```
+
+See [docs/mcp.md](docs/mcp.md) for full configuration details and usage.
+
 ## Future plans
 - Effective TUI to show the project current state 
 - Further experimentation with automation, embedding it further into AI tools
