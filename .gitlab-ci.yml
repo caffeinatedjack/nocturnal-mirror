@@ -15,14 +15,14 @@ variables:
 
 test:
   stage: test
-  image: golang:1.23
+  image: golang:1.24
   script:
     - go mod download
     - go test -v -race ./...
 
 build:linux:
   stage: build
-  image: golang:1.23
+  image: golang:1.24
   needs:
     - test
   rules:
@@ -36,7 +36,7 @@ build:linux:
 
 build:windows:
   stage: build
-  image: golang:1.23
+  image: golang:1.24
   needs:
     - test
   rules:
@@ -50,7 +50,7 @@ build:windows:
 
 build:macos:
   stage: build
-  image: golang:1.23
+  image: golang:1.24
   needs:
     - test
   rules:

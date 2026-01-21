@@ -2,7 +2,7 @@
 # Multi-stage build for CI/CD agent execution
 
 # Build nocturnal from source
-FROM golang:1.23-alpine AS nocturnal-builder
+FROM golang:1.24-alpine AS nocturnal-builder
 
 RUN apk add --no-cache git
 
