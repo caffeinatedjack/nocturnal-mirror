@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+	"gitlab.com/caffeinatedjack/nocturnal/cmd/tui"
 )
 
 var (
@@ -37,14 +38,23 @@ var completionCmd = &cobra.Command{
 	},
 }
 
+var tuiCmd = &cobra.Command{
+	Use:   "tui",
+	Short: "Launch terminal user interface",
+	Long:  helpText("tui"),
+	Run:   runTUI,
+}
+
 func init() {
 	rootCmd.Version = fmt.Sprintf("%s (built %s)", Version, BuildTime)
 	rootCmd.AddCommand(completionCmd)
+	rootCmd.AddCommand(tuiCmd)
 }
 
 func initHelp() {
 	rootCmd.Long = helpText("root")
 	completionCmd.Long = helpText("completion")
+	tuiCmd.Long = helpText("tui")
 }
 
 // Execute runs the root command.
@@ -52,5 +62,20 @@ func Execute() {
 	initHelp()
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
+	}
+}
+
+// runTUI launches the TUI.
+func runTUI(cmd *cobra.Command, args []string) {
+	// Get spec path
+	specPath, err := checkSpecWorkspace()
+	if err != nil {
+		printError("Specification workspace not initialized")
+		printDim("Run 'nocturnal spec init' first")
+		return
+	}
+
+	if err := tui.Run(specPath, Version); err != nil {
+		printError(fmt.Sprintf("TUI error: %v", err))
 	}
 }

@@ -44,6 +44,7 @@ Completed proposals are archived - their design and implementation documents are
 - **[Specification Management](./proposal.md)** - Create and manage proposals through their lifecycle
 - **[Rules Management](./rule.md)** - Define project-wide guidelines and constraints
 - **[Maintenance Management](./maintenance.md)** - Track recurring operational tasks with frequency-based due dates
+- **[Proposal Precursors (Experimental)](./precursor.md)** - Reusable, parameterized proposal templates
 - **[MCP Server](./mcp.md)** - Expose tools to AI assistants via Model Context Protocol
 - **[Documentation Management](./docs.md)** - Store and search API/library documentation
 

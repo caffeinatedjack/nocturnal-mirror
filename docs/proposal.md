@@ -119,10 +119,16 @@ Create a new proposal with template documents.
 
 ```bash
 nocturnal spec proposal add <change-slug>
+# Or with a precursor (experimental)
+nocturnal spec proposal add <change-slug> --precursor-path <path>
 ```
 
 **Arguments:**
 - `<change-slug>` - Name of the proposal (converted to lowercase with hyphens)
+
+**Flags:**
+- `--precursor-path <path>` - Create from precursor bundle (directory or .zip) (experimental)
+- `--overwrite` - Allow regenerating existing proposal and overwrite third-party docs
 
 **What it does:**
 - Creates `spec/proposal/<slug>/` directory
@@ -131,6 +137,15 @@ nocturnal spec proposal add <change-slug>
   - `design.md` - Design decision template
   - `implementation.md` - Implementation plan template
 - Fills templates with proposal name and slug
+
+**With Precursor (Experimental):**
+When using `--precursor-path`, the command follows a questionnaire-first workflow:
+1. **First run**: Creates `precursor-answers.yaml` with required inputs and exits
+2. **User fills answers**: Edit the generated answers file with your values
+3. **Second run** (with `--overwrite`): Generates proposal documents from templates
+4. **Third-party docs**: Installs bundled docs, overwrites existing if `--overwrite` is set
+
+See [Proposal Precursors](./precursor.md) for detailed documentation.
 
 **Slug conversion:**
 - Converts spaces and underscores to hyphens
@@ -142,7 +157,13 @@ nocturnal spec proposal add <change-slug>
 
 **Example:**
 ```bash
+# Standard proposal
 nocturnal spec proposal add user-authentication
+
+# From precursor (experimental)
+nocturnal spec proposal add db-migration --precursor-path ./templates/migration.zip
+# Fill in spec/proposal/db-migration/precursor-answers.yaml
+nocturnal spec proposal add db-migration --precursor-path ./templates/migration.zip --overwrite
 ```
 
 **Output:**

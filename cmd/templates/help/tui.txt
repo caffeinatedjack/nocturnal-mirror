@@ -1,0 +1,32 @@
+Launch terminal user interface for managing specifications, proposals, rules, maintenance, and documentation.
+
+The TUI provides an interactive way to navigate and manage all aspects of your specification workspace.
+
+Keybindings:
+  h/←   Previous tab
+  l/→   Next tab
+  j/↓   Navigate down
+  k/↑   Navigate up
+  Enter  Select item
+  ?      Show/hide help
+  q      Quit
+  r      Refresh data
+  e      Edit item (opens external editor)
+  n      Create new item
+  d      Delete item
+
+Pages:
+  Overview    Dashboard with quick stats and actions
+  Proposals   List, view, create, activate proposals
+  Rules       List, view, create rules
+  Maintenance List, view, manage maintenance items
+  Docs        Browse third-party documentation
+  Config      View and edit configuration
+  Stats       View project statistics
+
+Examples:
+    nocturnal tui
+
+Configuration:
+  The TUI uses the EDITOR environment variable to determine which editor to open.
+  Set EDITOR to your preferred editor (vim, nvim, nano, code, etc.)

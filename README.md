@@ -42,6 +42,11 @@ Provides a structured workspace with proposals (spec + design + implementation),
 │  │   │   ├── abandon             Archive without promoting                  │
 │  │   │   ├── remove              Delete proposal                            │
 │  │   │   └── graph               Show dependency graph                      │
+│  │   ├── precursor (experimental) Reusable proposal templates               │
+│  │   │   ├── init                Create new precursor bundle                │
+│  │   │   ├── validate            Check precursor structure                  │
+│  │   │   ├── pack                Create zip from directory                  │
+│  │   │   └── unpack              Extract zip to directory                   │
 │  │   ├── rule                  Project-wide rules                           │
 │  │   │   ├── add                 Create new rule                            │
 │  │   │   └── show                Display all rules                          │
@@ -159,6 +164,15 @@ Store condensed documentation for libraries and APIs:
 - Search by component name
 - Provide to agents for implementation context
 
+### Proposal Precursors - Reusable Templates (Experimental)
+Create shareable proposal templates for common scenarios:
+- **Parameterized templates**: Define custom inputs for proposals
+- **Custom documents**: Override spec, design, or implementation templates
+- **Bundled documentation**: Include relevant third-party docs
+- **Portable**: Share as directory or zip file across projects
+
+Example use cases: database migrations, service creation, API integration patterns.
+
 Read the [full documentation](/docs/index.md) for detailed usage.
 
 ## Quick Start
@@ -188,6 +202,14 @@ nocturnal spec proposal complete user-authentication
 # Create recurring maintenance tasks
 nocturnal spec maintenance add dependencies
 nocturnal spec maintenance list
+
+# (Experimental) Create a reusable precursor template
+nocturnal precursor init database-migration --out ./db-migration.zip
+
+# Use precursor to create a proposal
+nocturnal spec proposal add migrate-to-postgres --precursor-path ./db-migration.zip
+# Fill in the generated precursor-answers.yaml, then regenerate:
+nocturnal spec proposal add migrate-to-postgres --precursor-path ./db-migration.zip --overwrite
 ```
 
 ## Installation

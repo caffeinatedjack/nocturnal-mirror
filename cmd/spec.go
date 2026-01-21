@@ -251,6 +251,8 @@ func init() {
 	specProposalCmd.AddCommand(specProposalAbandonCmd)
 	specProposalCmd.AddCommand(specProposalCurrentCmd)
 
+	specProposalAddCmd.Flags().StringVar(&precursorPath, "precursor-path", "", "Path to precursor bundle (directory or .zip)")
+	specProposalAddCmd.Flags().BoolVar(&overwriteProposal, "overwrite", false, "Allow regeneration into existing proposal and overwrite third-party docs")
 	specProposalRemoveCmd.Flags().BoolVarP(&forceRemove, "force", "f", false, "Force removal even if proposal is active")
 
 	specRuleCmd.AddCommand(specRuleAddCmd)
@@ -648,11 +650,26 @@ func runSpecProposalAdd(cmd *cobra.Command, args []string) {
 	}
 	proposalPath := filepath.Join(specPath, proposalDir, slug)
 
+	// Check if proposal exists
+	proposalExists := false
 	if _, err := os.Stat(proposalPath); err == nil {
-		printError(fmt.Sprintf("Proposal '%s' already exists", slug))
+		proposalExists = true
+		if precursorPath == "" || !overwriteProposal {
+			printError(fmt.Sprintf("Proposal '%s' already exists", slug))
+			if precursorPath != "" {
+				printDim("Use --overwrite to regenerate from precursor")
+			}
+			return
+		}
+	}
+
+	// Branch: Use precursor if --precursor-path is specified
+	if precursorPath != "" {
+		runSpecProposalAddWithPrecursor(name, slug, specPath, proposalPath, proposalExists)
 		return
 	}
 
+	// Default branch: Create proposal from embedded templates
 	if err := os.MkdirAll(proposalPath, 0755); err != nil {
 		printError(fmt.Sprintf("Failed to create proposal directory: %v", err))
 		return
@@ -684,6 +701,183 @@ func runSpecProposalAdd(cmd *cobra.Command, args []string) {
 
 	printSuccess(fmt.Sprintf("Created proposal '%s'", slug))
 	printDim(fmt.Sprintf("Location: %s/", proposalPath))
+}
+
+// runSpecProposalAddWithPrecursor creates/updates a proposal using a precursor bundle
+func runSpecProposalAddWithPrecursor(name, slug, specPath, proposalPath string, proposalExists bool) {
+	// Load precursor bundle
+	bundle, err := LoadPrecursorBundle(precursorPath)
+	if err != nil {
+		printError(fmt.Sprintf("Failed to load precursor: %v", err))
+		return
+	}
+	defer bundle.Close()
+
+	// Validate precursor structure
+	if err := validatePrecursorStructure(bundle); err != nil {
+		printError(fmt.Sprintf("Invalid precursor: %v", err))
+		return
+	}
+
+	manifest := bundle.GetManifest()
+
+	// Create proposal directory if it doesn't exist
+	if !proposalExists {
+		if err := os.MkdirAll(proposalPath, 0755); err != nil {
+			printError(fmt.Sprintf("Failed to create proposal directory: %v", err))
+			return
+		}
+	}
+
+	// Load existing answers (if any)
+	existingAnswers, err := loadPrecursorAnswers(proposalPath)
+	if err != nil {
+		printError(fmt.Sprintf("Failed to load answers: %v", err))
+		return
+	}
+
+	// Merge manifest inputs with existing answers
+	answers := mergePrecursorAnswers(manifest, existingAnswers, precursorPath)
+
+	// Check for missing required inputs
+	missingInputs := getMissingRequiredInputs(answers)
+	if len(missingInputs) > 0 {
+		// Write questionnaire and exit
+		if err := savePrecursorAnswers(proposalPath, answers); err != nil {
+			printError(fmt.Sprintf("Failed to save answers file: %v", err))
+			return
+		}
+
+		printWarning(fmt.Sprintf("Proposal '%s' created but requires input", slug))
+		printDim(fmt.Sprintf("Please fill in the following required fields in: %s", filepath.Join(proposalPath, precursorAnswersFile)))
+		fmt.Println()
+		for _, key := range missingInputs {
+			input := answers.Inputs[key]
+			fmt.Printf("  • %s: %s\n", key, input.Prompt)
+		}
+		fmt.Println()
+		printDim("After filling in the answers, run:")
+		printDim(fmt.Sprintf("  nocturnal spec proposal add %s --precursor-path %s --overwrite", slug, precursorPath))
+		os.Exit(1)
+		return
+	}
+
+	// All inputs satisfied - generate proposal docs
+	templateData := struct {
+		Name   string
+		Slug   string
+		Inputs map[string]any
+	}{
+		Name:   name,
+		Slug:   slug,
+		Inputs: answersToTemplateData(answers),
+	}
+
+	// Render each proposal document
+	proposalTemplates := []struct {
+		filename     string
+		precursorTpl string
+		embeddedTpl  string
+	}{
+		{"specification.md", "templates/specification.md.tmpl", "templates/proposal/specification.md"},
+		{"design.md", "templates/design.md.tmpl", "templates/proposal/design.md"},
+		{"implementation.md", "templates/implementation.md.tmpl", "templates/proposal/implementation.md"},
+	}
+
+	for _, tpl := range proposalTemplates {
+		var content string
+		var err error
+
+		// Try to use precursor template first
+		if bundle.HasTemplate(tpl.precursorTpl[10:]) { // strip "templates/" prefix
+			tmplContent, readErr := bundle.ReadFile(tpl.precursorTpl)
+			if readErr == nil {
+				content, err = renderTemplateFromString(tpl.filename, string(tmplContent), templateData)
+			} else {
+				err = readErr
+			}
+		} else {
+			// Fall back to embedded template
+			content, err = renderTemplate(tpl.embeddedTpl, templateData)
+		}
+
+		if err != nil {
+			printError(fmt.Sprintf("Failed to render %s: %v", tpl.filename, err))
+			return
+		}
+
+		filePath := filepath.Join(proposalPath, tpl.filename)
+		if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
+			printError(fmt.Sprintf("Failed to write %s: %v", tpl.filename, err))
+			return
+		}
+	}
+
+	// Install third-party docs
+	thirdDocs, err := bundle.ListThirdPartyDocs()
+	if err != nil {
+		printWarning(fmt.Sprintf("Failed to list third-party docs: %v", err))
+	} else if len(thirdDocs) > 0 {
+		conflicts := installThirdPartyDocs(bundle, specPath, thirdDocs, overwriteProposal)
+		if len(conflicts) > 0 {
+			printWarning(fmt.Sprintf("Skipped %d existing third-party doc(s):", len(conflicts)))
+			for _, conflict := range conflicts {
+				fmt.Printf("  • %s\n", filepath.Base(conflict))
+			}
+			printDim("Use --overwrite to replace existing files")
+		}
+	}
+
+	// Save the answers file (for future regeneration)
+	if err := savePrecursorAnswers(proposalPath, answers); err != nil {
+		printWarning(fmt.Sprintf("Failed to save answers file: %v", err))
+	}
+
+	if proposalExists {
+		printSuccess(fmt.Sprintf("Regenerated proposal '%s' from precursor", slug))
+	} else {
+		printSuccess(fmt.Sprintf("Created proposal '%s' from precursor", slug))
+	}
+	printDim(fmt.Sprintf("Location: %s/", proposalPath))
+	printDim(fmt.Sprintf("Precursor: %s", manifest.ID))
+}
+
+// installThirdPartyDocs copies third-party docs from precursor to spec/third/
+// Returns list of files that already existed (conflicts)
+func installThirdPartyDocs(bundle *PrecursorBundle, specPath string, docPaths []string, overwrite bool) []string {
+	thirdDir := filepath.Join(specPath, "third")
+	if err := os.MkdirAll(thirdDir, 0755); err != nil {
+		printWarning(fmt.Sprintf("Failed to create third-party docs directory: %v", err))
+		return nil
+	}
+
+	var conflicts []string
+
+	for _, docPath := range docPaths {
+		filename := filepath.Base(docPath)
+		destPath := filepath.Join(thirdDir, filename)
+
+		// Check for conflicts
+		if fileExists(destPath) && !overwrite {
+			conflicts = append(conflicts, docPath)
+			continue
+		}
+
+		// Read from bundle
+		content, err := bundle.ReadFile(docPath)
+		if err != nil {
+			printWarning(fmt.Sprintf("Failed to read %s from precursor: %v", docPath, err))
+			continue
+		}
+
+		// Write to spec/third/
+		if err := os.WriteFile(destPath, content, 0644); err != nil {
+			printWarning(fmt.Sprintf("Failed to write %s: %v", filename, err))
+			continue
+		}
+	}
+
+	return conflicts
 }
 
 func runSpecProposalRemove(cmd *cobra.Command, args []string) {
