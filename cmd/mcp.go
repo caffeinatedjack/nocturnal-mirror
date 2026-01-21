@@ -78,14 +78,27 @@ func registerContextTool(s *server.MCPServer) {
 		}
 
 		var sections []string
+		var summary strings.Builder
 
 		// Rules + project design (constraints)
 		content, err := readRulesAndProject(specPath)
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
+		ruleCount := 0
+		projectExists := false
 		if content != "" {
 			sections = append(sections, content)
+			// Count rules
+			rulesDirPath := filepath.Join(specPath, ruleDir)
+			if files, err := listMarkdownFiles(rulesDirPath); err == nil {
+				ruleCount = len(files)
+			}
+			// Check if project.md exists
+			projectPath := filepath.Join(specPath, projectFile)
+			if fileExists(projectPath) {
+				projectExists = true
+			}
 		}
 
 		// Check if this is a maintenance context request
@@ -109,6 +122,14 @@ func registerContextTool(s *server.MCPServer) {
 
 			var result strings.Builder
 			result.WriteString(fmt.Sprintf("# Maintenance: %s\n\n", maintenanceSlug))
+
+			// Include full maintenance file content first
+			fileContent, err := os.ReadFile(filePath)
+			if err == nil && len(fileContent) > 0 {
+				result.WriteString("## Maintenance Item Content\n\n")
+				result.Write(fileContent)
+				result.WriteString("\n\n---\n\n")
+			}
 
 			// Separate due and not-due requirements
 			var dueReqs, notDueReqs []MaintenanceRequirement
@@ -156,10 +177,20 @@ func registerContextTool(s *server.MCPServer) {
 			}
 
 			result.WriteString("## Instructions\n\n")
-			result.WriteString("For each due requirement you action, call `task_complete` with maintenance=true, the slug, and requirement ID.\n")
+			result.WriteString(fmt.Sprintf("For each due requirement you action, call `task_complete` with the requirement ID and maintenance_slug=\"%s\".\n", maintenanceSlug))
+
+			// Build summary for maintenance
+			summary.WriteString("# Context Summary\n\n")
+			summary.WriteString(fmt.Sprintf("- Rules: %d file(s)\n", ruleCount))
+			if projectExists {
+				summary.WriteString("- Project Design: included\n")
+			} else {
+				summary.WriteString("- Project Design: not found\n")
+			}
+			summary.WriteString(fmt.Sprintf("- Maintenance: %s (%d due, %d total requirements)\n", maintenanceSlug, len(dueReqs), len(reqs)))
 
 			sections = append(sections, result.String())
-			return mcp.NewToolResultText(strings.Join(sections, "\n\n---\n\n")), nil
+			return mcp.NewToolResultText(summary.String() + "\n\n---\n\n" + strings.Join(sections, "\n\n---\n\n")), nil
 		}
 
 		// Proposal context
@@ -199,9 +230,11 @@ func registerContextTool(s *server.MCPServer) {
 
 		// Include affected files if configured
 		config := loadConfigOrDefault(specPath)
+		affectedFileCount := 0
 		if config.Context.IncludeAffectedFiles {
 			affectedFiles, err := getAffectedFiles(proposalPath)
 			if err == nil && len(affectedFiles) > 0 {
+				affectedFileCount = len(affectedFiles)
 				affectedSection := buildAffectedFilesSection(affectedFiles, config.Context.MaxFileLines)
 				if affectedSection != "" {
 					sections = append(sections, affectedSection)
@@ -209,7 +242,37 @@ func registerContextTool(s *server.MCPServer) {
 			}
 		}
 
-		return mcp.NewToolResultText(strings.Join(sections, "\n\n---\n\n")), nil
+		// Build summary for proposal
+		summary.WriteString("# Context Summary\n\n")
+		summary.WriteString(fmt.Sprintf("- Rules: %d file(s)\n", ruleCount))
+		if projectExists {
+			summary.WriteString("- Project Design: included\n")
+		} else {
+			summary.WriteString("- Project Design: not found\n")
+		}
+		summary.WriteString(fmt.Sprintf("- Active Proposal: %s\n", slug))
+
+		// Check if spec and design files exist
+		specExists := fileExists(filepath.Join(proposalPath, "specification.md"))
+		designExists := fileExists(filepath.Join(proposalPath, "design.md"))
+
+		if specExists {
+			summary.WriteString("- Specification: included\n")
+		} else {
+			summary.WriteString("- Specification: not found\n")
+		}
+
+		if designExists {
+			summary.WriteString("- Design: included\n")
+		} else {
+			summary.WriteString("- Design: not found\n")
+		}
+
+		if config.Context.IncludeAffectedFiles {
+			summary.WriteString(fmt.Sprintf("- Affected Files: %d file(s)\n", affectedFileCount))
+		}
+
+		return mcp.NewToolResultText(summary.String() + "\n\n---\n\n" + strings.Join(sections, "\n\n---\n\n")), nil
 	})
 }
 
