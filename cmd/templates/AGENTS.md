@@ -54,10 +54,9 @@ spec/
 
 | Tool                    | Description                                                                 |
 |-------------------------|-----------------------------------------------------------------------------|
-| `context`               | Get project rules, design, and active proposal's spec + design docs. Returns integrity warnings if proposal files changed since activation. |
-| `tasks`                 | Get current phase tasks with IDs (e.g., "1.1", "1.2") - shows first incomplete phase only |
-| `task_complete`         | Mark a task complete by ID (params: id: "1.1"). If git.auto_commit is enabled, automatically commits all changes. |
-| `task_snapshot`         | Create a git snapshot before starting work on a task (params: id: "1.1"). Only effective if git.auto_snapshot enabled in config. |
+| `context`               | Get project rules, design, and active proposal's spec + design docs. For maintenance, pass maintenance_slug parameter. Returns integrity warnings if proposal files changed since activation. |
+| `tasks`                 | Get current phase tasks with IDs (e.g., "1.1", "1.2") for proposals (shows first incomplete phase only), or maintenance requirements (pass maintenance_slug parameter). |
+| `task_complete`         | Mark a task complete by ID (params: id: "1.1"). For maintenance, also pass maintenance_slug. If git.auto_commit is enabled, automatically commits all changes. |
 
 ### Documentation Tools
 
@@ -71,8 +70,6 @@ spec/
 | Tool                    | Description                                                                 |
 |-------------------------|-----------------------------------------------------------------------------|
 | `maintenance_list`      | List all maintenance items with due/total requirement counts                |
-| `maintenance_context`   | Get requirements for a maintenance item, showing which are currently due (params: slug: string) |
-| `maintenance_actioned`  | Mark a requirement as actioned, records current timestamp (params: slug: string, id: string) |
 
 ## MCP Prompts Available
 
@@ -136,10 +133,9 @@ Dependencies must exist as completed specifications in `spec/section/` before a 
 4. **Track progress**: Use `tasks` to see current work, `task_complete` to mark done
 5. **Update internal todo**: Keep your own task list in sync with Nocturnal tasks
 6. **Respect integrity warnings**: If `context` returns an integrity warning about changed files, STOP and ask user to confirm
-7. **Use task_snapshot**: If git integration is enabled, create snapshots before starting tasks
-8. **Commit semantically**: If git.auto_commit is enabled, task completion automatically commits with task description
-9. **Check maintenance**: Use `maintenance_list` to see if any recurring tasks are due
-10. **Search docs first**: Before asking about third-party APIs, use `docs_search` to check available documentation
+7. **Commit semantically**: If git.auto_commit is enabled, task completion automatically commits with task description
+8. **Check maintenance**: Use `maintenance_list` to see if any recurring tasks are due
+9. **Search docs first**: Before asking about third-party APIs, use `docs_search` to check available documentation
 
 ## Best Practices
 

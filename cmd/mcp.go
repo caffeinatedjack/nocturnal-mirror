@@ -46,7 +46,6 @@ func runMCP(cmd *cobra.Command, args []string) {
 	registerContextTool(s)
 	registerTasksTool(s)
 	registerTaskCompleteTool(s)
-	registerTaskSnapshotTool(s)
 	registerDocsListTool(s)
 	registerDocsSearchTool(s)
 	registerMaintenanceListTool(s)
@@ -791,79 +790,6 @@ func registerTaskCompleteTool(s *server.MCPServer) {
 			}
 			result.WriteString(fmt.Sprintf("Current phase: %s (%d tasks remaining)", currentPhase.Name, remaining))
 		}
-
-		return mcp.NewToolResultText(result.String()), nil
-	})
-}
-
-func registerTaskSnapshotTool(s *server.MCPServer) {
-	tool := mcp.NewTool("task_snapshot",
-		mcp.WithDescription("Create a git snapshot before starting work on a task. This captures the current state before making changes."),
-		mcp.WithString("id",
-			mcp.Required(),
-			mcp.Description("The task ID that you're about to start working on (e.g., '1.1', '2.3')"),
-		),
-	)
-
-	s.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		taskID, ok := request.Params.Arguments["id"].(string)
-		if !ok {
-			return mcp.NewToolResultError("id parameter must be a string"), nil
-		}
-		taskID = strings.TrimSpace(taskID)
-
-		specPath, err := checkSpecWorkspace()
-		if err != nil {
-			return mcp.NewToolResultError(err.Error()), nil
-		}
-
-		// Check if git auto-snapshot is enabled
-		config := loadConfigOrDefault(specPath)
-		if !config.Git.AutoSnapshot {
-			return mcp.NewToolResultText(fmt.Sprintf("Git auto-snapshot is disabled. Task %s ready to start.\n\nTo enable: Set git.auto_snapshot: true in spec/nocturnal.yaml", taskID)), nil
-		}
-
-		slug, _, err := getPrimaryProposal(specPath)
-		if err != nil {
-			return mcp.NewToolResultError(err.Error()), nil
-		}
-		if slug == "" {
-			return mcp.NewToolResultError("No active proposal"), nil
-		}
-
-		// Create git snapshot
-		gitMgr := NewGitSnapshotManager(specPath, slug, taskID)
-		if err := gitMgr.CreateSnapshot(); err != nil {
-			return mcp.NewToolResultError(fmt.Sprintf("Failed to create snapshot: %v", err)), nil
-		}
-
-		// Save snapshot reference in state
-		state, err := loadState(specPath)
-		if err != nil {
-			return mcp.NewToolResultError(fmt.Sprintf("Failed to load state: %v", err)), nil
-		}
-
-		snapshotRef := gitMgr.GetSnapshotRef()
-		if snapshotRef != "" {
-			state.GitSnapshots[taskID] = GitSnapshotState{
-				SnapshotRef: snapshotRef,
-				TaskID:      taskID,
-				Timestamp:   time.Now().Format(time.RFC3339),
-			}
-
-			if err := saveState(specPath, state); err != nil {
-				return mcp.NewToolResultError(fmt.Sprintf("Failed to save state: %v", err)), nil
-			}
-		}
-
-		var result strings.Builder
-		result.WriteString(fmt.Sprintf("Git snapshot created for task %s\n\n", taskID))
-		if snapshotRef != "" {
-			result.WriteString(fmt.Sprintf("Snapshot ref: %s\n", snapshotRef[:8]))
-		} else {
-			result.WriteString("No uncommitted changes to snapshot (working directory clean)\n")
-		}
-		result.WriteString("\nYou can now proceed with implementing the task. When complete, use task_complete to commit all changes.")
 
 		return mcp.NewToolResultText(result.String()), nil
 	})

@@ -35,11 +35,10 @@ func loadState(specPath string) (*State, error) {
 	if err != nil {
 		if os.IsNotExist(err) {
 			return &State{
-				Version:      1,
-				Active:       []string{},
-				Hashes:       make(map[string]map[string]string),
-				Maintenance:  make(map[string]map[string]MaintenanceState),
-				GitSnapshots: make(map[string]GitSnapshotState),
+				Version:     1,
+				Active:      []string{},
+				Hashes:      make(map[string]map[string]string),
+				Maintenance: make(map[string]map[string]MaintenanceState),
 			}, nil
 		}
 		return nil, err
@@ -55,9 +54,6 @@ func loadState(specPath string) (*State, error) {
 	}
 	if state.Maintenance == nil {
 		state.Maintenance = make(map[string]map[string]MaintenanceState)
-	}
-	if state.GitSnapshots == nil {
-		state.GitSnapshots = make(map[string]GitSnapshotState)
 	}
 
 	return &state, nil

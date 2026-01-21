@@ -31,8 +31,7 @@ type ContextConfig struct {
 
 // GitConfig controls git integration behavior.
 type GitConfig struct {
-	AutoSnapshot bool `yaml:"auto_snapshot"` // Automatically create git snapshots before tasks
-	AutoCommit   bool `yaml:"auto_commit"`   // Automatically commit changes when tasks complete
+	AutoCommit bool `yaml:"auto_commit"` // Automatically commit changes when tasks complete
 }
 
 // DefaultConfig returns the default configuration.
@@ -47,8 +46,7 @@ func DefaultConfig() *Config {
 			MaxFileLines:         50,
 		},
 		Git: GitConfig{
-			AutoSnapshot: true,
-			AutoCommit:   true,
+			AutoCommit: true,
 		},
 	}
 }
