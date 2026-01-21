@@ -4,15 +4,13 @@ This allows AI assistants and other MCP clients to interact with nocturnal's
 agent functionality programmatically.
 
 Exposed tools:
-    context                 Get project context (rules, spec, design) for the active proposal
-    tasks                   Get current phase tasks (use task_complete to mark done)
-    task_complete           Mark a task as complete by ID (e.g., "1.1")
+    context                 Get project context (rules, spec, design) for active proposal or maintenance item
+    tasks                   Get current phase tasks for proposal or maintenance (use task_complete to mark done)
+    task_complete           Mark a proposal task or maintenance requirement as complete
     task_snapshot           Create a git snapshot before starting a task
     docs_list               List available library and API documentation
     docs_search             Search library and API documentation by name
     maintenance_list        List all maintenance items with due/total requirement counts
-    maintenance_context     Get requirements for a maintenance item
-    maintenance_actioned    Mark a maintenance requirement as actioned
 
 Exposed prompts:
     elaborate-spec          Elaborate on a proposal with comprehensive design, steps, and dependencies

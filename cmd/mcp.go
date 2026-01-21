@@ -50,8 +50,6 @@ func runMCP(cmd *cobra.Command, args []string) {
 	registerDocsListTool(s)
 	registerDocsSearchTool(s)
 	registerMaintenanceListTool(s)
-	registerMaintenanceContextTool(s)
-	registerMaintenanceActionedTool(s)
 
 	// Prompts
 	registerAddThirdPartyDocsPrompt(s)
@@ -68,7 +66,10 @@ func runMCP(cmd *cobra.Command, args []string) {
 
 func registerContextTool(s *server.MCPServer) {
 	tool := mcp.NewTool("context",
-		mcp.WithDescription("Get project context for implementing the active proposal: rules, project design, specification, and design docs."),
+		mcp.WithDescription("Get project context for implementing the active proposal: rules, project design, specification, and design docs. Optionally include maintenance context."),
+		mcp.WithString("maintenance_slug",
+			mcp.Description("Optional: maintenance item slug to include maintenance context"),
+		),
 	)
 
 	s.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -88,6 +89,81 @@ func registerContextTool(s *server.MCPServer) {
 			sections = append(sections, content)
 		}
 
+		// Check if this is a maintenance context request
+		maintenanceSlug, _ := request.Params.Arguments["maintenance_slug"].(string)
+		if maintenanceSlug != "" {
+			// Maintenance context
+			filePath := filepath.Join(specPath, maintenanceDir, maintenanceSlug+".md")
+			if !fileExists(filePath) {
+				return mcp.NewToolResultError(fmt.Sprintf("Maintenance item '%s' does not exist", maintenanceSlug)), nil
+			}
+
+			state, err := loadState(specPath)
+			if err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("Failed to load state: %v", err)), nil
+			}
+
+			reqs, err := parseMaintenanceFile(filePath, state, maintenanceSlug)
+			if err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("Failed to parse maintenance file: %v", err)), nil
+			}
+
+			var result strings.Builder
+			result.WriteString(fmt.Sprintf("# Maintenance: %s\n\n", maintenanceSlug))
+
+			// Separate due and not-due requirements
+			var dueReqs, notDueReqs []MaintenanceRequirement
+			for _, req := range reqs {
+				if req.Due {
+					dueReqs = append(dueReqs, req)
+				} else {
+					notDueReqs = append(notDueReqs, req)
+				}
+			}
+
+			// Due requirements (these should be actioned)
+			result.WriteString(fmt.Sprintf("## Due Requirements (%d)\n\n", len(dueReqs)))
+			if len(dueReqs) == 0 {
+				result.WriteString("No requirements are currently due.\n\n")
+			} else {
+				result.WriteString("These requirements should be addressed:\n\n")
+				for _, req := range dueReqs {
+					result.WriteString(fmt.Sprintf("- **[%s]** %s\n", req.ID, req.Text))
+					if req.Freq != "" {
+						result.WriteString(fmt.Sprintf("  - Frequency: %s\n", req.Freq))
+					}
+					if req.LastActioned != "" {
+						result.WriteString(fmt.Sprintf("  - Last actioned: %s\n", req.LastActioned))
+					}
+					result.WriteString("\n")
+				}
+			}
+
+			// Not due requirements (informational only)
+			if len(notDueReqs) > 0 {
+				result.WriteString(fmt.Sprintf("## Not Due Yet (%d)\n\n", len(notDueReqs)))
+				result.WriteString("These requirements do not need action right now:\n\n")
+				for _, req := range notDueReqs {
+					result.WriteString(fmt.Sprintf("- **[%s]** %s", req.ID, req.Text))
+					if req.Freq != "" {
+						result.WriteString(fmt.Sprintf(" (freq: %s)", req.Freq))
+					}
+					if req.LastActioned != "" {
+						result.WriteString(fmt.Sprintf(" - last: %s", req.LastActioned))
+					}
+					result.WriteString("\n")
+				}
+				result.WriteString("\n")
+			}
+
+			result.WriteString("## Instructions\n\n")
+			result.WriteString("For each due requirement you action, call `task_complete` with maintenance=true, the slug, and requirement ID.\n")
+
+			sections = append(sections, result.String())
+			return mcp.NewToolResultText(strings.Join(sections, "\n\n---\n\n")), nil
+		}
+
+		// Proposal context
 		slug, proposalPath, err := getPrimaryProposal(specPath)
 		if err != nil {
 			return mcp.NewToolResultText(err.Error()), nil
@@ -140,7 +216,10 @@ func registerContextTool(s *server.MCPServer) {
 
 func registerTasksTool(s *server.MCPServer) {
 	tool := mcp.NewTool("tasks",
-		mcp.WithDescription("Get the current phase tasks for the active proposal. Shows only the first incomplete phase. Use task_snapshot before starting a task (optional, if git integration enabled) and task_complete to mark tasks done."),
+		mcp.WithDescription("Get the current phase tasks for the active proposal or maintenance item. For proposals, shows only the first incomplete phase. For maintenance, shows due requirements. Use task_complete to mark tasks done."),
+		mcp.WithString("maintenance_slug",
+			mcp.Description("Optional: maintenance item slug to get maintenance tasks instead of proposal tasks"),
+		),
 	)
 
 	s.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -149,6 +228,56 @@ func registerTasksTool(s *server.MCPServer) {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
 
+		// Check if this is a maintenance task request
+		maintenanceSlug, _ := request.Params.Arguments["maintenance_slug"].(string)
+		if maintenanceSlug != "" {
+			// Maintenance tasks
+			filePath := filepath.Join(specPath, maintenanceDir, maintenanceSlug+".md")
+			if !fileExists(filePath) {
+				return mcp.NewToolResultError(fmt.Sprintf("Maintenance item '%s' does not exist", maintenanceSlug)), nil
+			}
+
+			state, err := loadState(specPath)
+			if err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("Failed to load state: %v", err)), nil
+			}
+
+			reqs, err := parseMaintenanceFile(filePath, state, maintenanceSlug)
+			if err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("Failed to parse maintenance file: %v", err)), nil
+			}
+
+			var dueReqs []MaintenanceRequirement
+			for _, req := range reqs {
+				if req.Due {
+					dueReqs = append(dueReqs, req)
+				}
+			}
+
+			var result strings.Builder
+			result.WriteString(fmt.Sprintf("# Maintenance Tasks: %s\n\n", maintenanceSlug))
+			result.WriteString(fmt.Sprintf("Due Requirements: %d\n\n", len(dueReqs)))
+
+			if len(dueReqs) == 0 {
+				result.WriteString("No requirements are currently due.")
+			} else {
+				result.WriteString("Tasks to complete:\n\n")
+				for _, req := range dueReqs {
+					result.WriteString(fmt.Sprintf("- [ ] **[%s]** %s\n", req.ID, req.Text))
+					if req.Freq != "" {
+						result.WriteString(fmt.Sprintf("  - Frequency: %s\n", req.Freq))
+					}
+					if req.LastActioned != "" {
+						result.WriteString(fmt.Sprintf("  - Last actioned: %s\n", req.LastActioned))
+					}
+				}
+				result.WriteString("\n\nUse task_complete with maintenance_slug and the requirement ID to mark each as actioned.")
+			}
+
+			return mcp.NewToolResultText(result.String()), nil
+		}
+
+		// Proposal tasks
 		slug, proposalPath, err := getPrimaryProposal(specPath)
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
@@ -490,10 +619,13 @@ func registerDocsSearchTool(s *server.MCPServer) {
 
 func registerTaskCompleteTool(s *server.MCPServer) {
 	tool := mcp.NewTool("task_complete",
-		mcp.WithDescription("Mark a task as complete in the active proposal's implementation.md using its task ID (e.g., '1.1', '2.3'). If git.auto_commit is enabled, automatically commits all changes."),
+		mcp.WithDescription("Mark a task as complete in the active proposal's implementation.md or mark a maintenance requirement as actioned. For proposals, use task ID (e.g., '1.1', '2.3'). For maintenance, provide maintenance_slug and requirement ID. If git.auto_commit is enabled, automatically commits all changes."),
 		mcp.WithString("id",
 			mcp.Required(),
-			mcp.Description("The task ID to mark as complete (e.g., '1.1' for phase 1, task 1)"),
+			mcp.Description("The task ID to mark as complete (e.g., '1.1' for phase 1, task 1) or maintenance requirement ID"),
+		),
+		mcp.WithString("maintenance_slug",
+			mcp.Description("Optional: maintenance item slug if marking a maintenance requirement as actioned"),
 		),
 	)
 
@@ -509,6 +641,61 @@ func registerTaskCompleteTool(s *server.MCPServer) {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
 
+		// Check if this is a maintenance action
+		maintenanceSlug, _ := request.Params.Arguments["maintenance_slug"].(string)
+		if maintenanceSlug != "" {
+			// Maintenance actioned
+			filePath := filepath.Join(specPath, maintenanceDir, maintenanceSlug+".md")
+			if !fileExists(filePath) {
+				return mcp.NewToolResultError(fmt.Sprintf("Maintenance item '%s' does not exist", maintenanceSlug)), nil
+			}
+
+			state, err := loadState(specPath)
+			if err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("Failed to load state: %v", err)), nil
+			}
+
+			// Parse file to validate ID exists
+			reqs, err := parseMaintenanceFile(filePath, state, maintenanceSlug)
+			if err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("Failed to parse maintenance file: %v", err)), nil
+			}
+
+			found := false
+			var reqText string
+			for _, req := range reqs {
+				if req.ID == taskID {
+					found = true
+					reqText = req.Text
+					break
+				}
+			}
+
+			if !found {
+				return mcp.NewToolResultError(fmt.Sprintf("Requirement ID '%s' not found in maintenance item '%s'", taskID, maintenanceSlug)), nil
+			}
+
+			// Update state
+			if state.Maintenance == nil {
+				state.Maintenance = make(map[string]map[string]MaintenanceState)
+			}
+			if state.Maintenance[maintenanceSlug] == nil {
+				state.Maintenance[maintenanceSlug] = make(map[string]MaintenanceState)
+			}
+
+			timestamp := time.Now().Format(time.RFC3339)
+			state.Maintenance[maintenanceSlug][taskID] = MaintenanceState{
+				LastActioned: timestamp,
+			}
+
+			if err := saveState(specPath, state); err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("Failed to save state: %v", err)), nil
+			}
+
+			return mcp.NewToolResultText(fmt.Sprintf("Marked '%s' as actioned at %s\n\n%s", taskID, timestamp, reqText)), nil
+		}
+
+		// Proposal task completion
 		slug, proposalPath, err := getPrimaryProposal(specPath)
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
@@ -1356,176 +1543,6 @@ func registerMaintenanceListTool(s *server.MCPServer) {
 	})
 }
 
-func registerMaintenanceContextTool(s *server.MCPServer) {
-	tool := mcp.NewTool("maintenance_context",
-		mcp.WithDescription("Get requirements for a maintenance item, showing which are currently due."),
-		mcp.WithString("slug",
-			mcp.Required(),
-			mcp.Description("Maintenance item slug"),
-		),
-	)
-
-	s.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		slug, ok := request.Params.Arguments["slug"].(string)
-		if !ok {
-			return mcp.NewToolResultError("slug parameter must be a string"), nil
-		}
-
-		specPath, err := checkSpecWorkspace()
-		if err != nil {
-			return mcp.NewToolResultError(err.Error()), nil
-		}
-
-		filePath := filepath.Join(specPath, maintenanceDir, slug+".md")
-		if !fileExists(filePath) {
-			return mcp.NewToolResultError(fmt.Sprintf("Maintenance item '%s' does not exist", slug)), nil
-		}
-
-		state, err := loadState(specPath)
-		if err != nil {
-			return mcp.NewToolResultError(fmt.Sprintf("Failed to load state: %v", err)), nil
-		}
-
-		reqs, err := parseMaintenanceFile(filePath, state, slug)
-		if err != nil {
-			return mcp.NewToolResultError(fmt.Sprintf("Failed to parse maintenance file: %v", err)), nil
-		}
-
-		var result strings.Builder
-		result.WriteString(fmt.Sprintf("# Maintenance: %s\n\n", slug))
-
-		// Separate due and not-due requirements
-		var dueReqs, notDueReqs []MaintenanceRequirement
-		for _, req := range reqs {
-			if req.Due {
-				dueReqs = append(dueReqs, req)
-			} else {
-				notDueReqs = append(notDueReqs, req)
-			}
-		}
-
-		// Due requirements (these should be actioned)
-		result.WriteString(fmt.Sprintf("## Due Requirements (%d)\n\n", len(dueReqs)))
-		if len(dueReqs) == 0 {
-			result.WriteString("No requirements are currently due.\n\n")
-		} else {
-			result.WriteString("These requirements should be addressed:\n\n")
-			for _, req := range dueReqs {
-				result.WriteString(fmt.Sprintf("- **[%s]** %s\n", req.ID, req.Text))
-				if req.Freq != "" {
-					result.WriteString(fmt.Sprintf("  - Frequency: %s\n", req.Freq))
-				}
-				if req.LastActioned != "" {
-					result.WriteString(fmt.Sprintf("  - Last actioned: %s\n", req.LastActioned))
-				}
-				result.WriteString("\n")
-			}
-		}
-
-		// Not due requirements (informational only)
-		if len(notDueReqs) > 0 {
-			result.WriteString(fmt.Sprintf("## Not Due Yet (%d)\n\n", len(notDueReqs)))
-			result.WriteString("These requirements do not need action right now:\n\n")
-			for _, req := range notDueReqs {
-				result.WriteString(fmt.Sprintf("- **[%s]** %s", req.ID, req.Text))
-				if req.Freq != "" {
-					result.WriteString(fmt.Sprintf(" (freq: %s)", req.Freq))
-				}
-				if req.LastActioned != "" {
-					result.WriteString(fmt.Sprintf(" - last: %s", req.LastActioned))
-				}
-				result.WriteString("\n")
-			}
-			result.WriteString("\n")
-		}
-
-		result.WriteString("## Instructions\n\n")
-		result.WriteString("For each due requirement you action, call `maintenance_actioned` with the slug and requirement ID.\n")
-
-		return mcp.NewToolResultText(result.String()), nil
-	})
-}
-
-func registerMaintenanceActionedTool(s *server.MCPServer) {
-	tool := mcp.NewTool("maintenance_actioned",
-		mcp.WithDescription("Mark a requirement as actioned (records current timestamp)."),
-		mcp.WithString("slug",
-			mcp.Required(),
-			mcp.Description("Maintenance item slug"),
-		),
-		mcp.WithString("id",
-			mcp.Required(),
-			mcp.Description("Requirement ID to mark as actioned"),
-		),
-	)
-
-	s.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		slug, ok := request.Params.Arguments["slug"].(string)
-		if !ok {
-			return mcp.NewToolResultError("slug parameter must be a string"), nil
-		}
-
-		id, ok := request.Params.Arguments["id"].(string)
-		if !ok {
-			return mcp.NewToolResultError("id parameter must be a string"), nil
-		}
-
-		specPath, err := checkSpecWorkspace()
-		if err != nil {
-			return mcp.NewToolResultError(err.Error()), nil
-		}
-
-		filePath := filepath.Join(specPath, maintenanceDir, slug+".md")
-		if !fileExists(filePath) {
-			return mcp.NewToolResultError(fmt.Sprintf("Maintenance item '%s' does not exist", slug)), nil
-		}
-
-		state, err := loadState(specPath)
-		if err != nil {
-			return mcp.NewToolResultError(fmt.Sprintf("Failed to load state: %v", err)), nil
-		}
-
-		// Parse file to validate ID exists
-		reqs, err := parseMaintenanceFile(filePath, state, slug)
-		if err != nil {
-			return mcp.NewToolResultError(fmt.Sprintf("Failed to parse maintenance file: %v", err)), nil
-		}
-
-		found := false
-		var reqText string
-		for _, req := range reqs {
-			if req.ID == id {
-				found = true
-				reqText = req.Text
-				break
-			}
-		}
-
-		if !found {
-			return mcp.NewToolResultError(fmt.Sprintf("Requirement ID '%s' not found in maintenance item '%s'", id, slug)), nil
-		}
-
-		// Update state
-		if state.Maintenance == nil {
-			state.Maintenance = make(map[string]map[string]MaintenanceState)
-		}
-		if state.Maintenance[slug] == nil {
-			state.Maintenance[slug] = make(map[string]MaintenanceState)
-		}
-
-		timestamp := time.Now().Format(time.RFC3339)
-		state.Maintenance[slug][id] = MaintenanceState{
-			LastActioned: timestamp,
-		}
-
-		if err := saveState(specPath, state); err != nil {
-			return mcp.NewToolResultError(fmt.Sprintf("Failed to save state: %v", err)), nil
-		}
-
-		return mcp.NewToolResultText(fmt.Sprintf("Marked '%s' as actioned at %s\n\n%s", id, timestamp, reqText)), nil
-	})
-}
-
 func registerStartMaintenancePrompt(s *server.MCPServer) {
 	prompt := mcp.NewPrompt("start-maintenance",
 		mcp.WithPromptDescription("Execute maintenance requirements for a maintenance item"),
@@ -1542,7 +1559,7 @@ func registerStartMaintenancePrompt(s *server.MCPServer) {
 
 ## Setup
 
-1. Call the MCP tool "maintenance_context" with slug="%s" to get the requirements.
+1. Call the MCP tool "context" with maintenance_slug="%s" to get the requirements.
 2. Focus ONLY on the "Due Requirements" section. Ignore "Not Due Yet" requirements.
 3. Review your internal todo/task list and add the due requirements.
 
@@ -1567,7 +1584,7 @@ For EACH due requirement:
 
 ### Step 4: Mark as Actioned
 - If the requirement was successfully completed, call:
-  maintenance_actioned(slug="%s", id="<requirement-id>")
+  task_complete(id="<requirement-id>", maintenance_slug="%s")
 - This records the timestamp so the requirement won't be due again until its frequency interval elapses.
 
 ## Important Notes
@@ -1582,8 +1599,8 @@ For EACH due requirement:
 When all due requirements are actioned:
 1. List which requirements were completed.
 2. Note any requirements that failed or were skipped.
-3. Call maintenance_context again to confirm no requirements are still due.
-`, slug, slug, slug)
+3. Call context with maintenance_slug="%s" again to confirm no requirements are still due.
+`, slug, slug, slug, slug)
 
 		return &mcp.GetPromptResult{
 			Description: "Execute maintenance requirements",
