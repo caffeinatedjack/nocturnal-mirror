@@ -227,6 +227,8 @@ make install
 
 Nocturnal exposes its functionality via Model Context Protocol (MCP), allowing AI assistants to access your project context.
 
+![MCP Screen](docs/mcp-pic.png)
+
 ### OpenCode
 
 Add to `~/.opencode/config.json`:
